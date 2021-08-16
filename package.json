@@ -1,0 +1,19 @@
+{
+  "name": "winzig",
+  "version": "0.1.0",
+  "description": "Requests the presence of Winzig, the perfect goblin barmaid, who will attend to your needs.",
+  "main": "index.js",
+  "scripts": {
+    "test": "mocha"
+  },
+  "author": "",
+  "license": "GPL-3.0-or-later",
+  "dependencies": {
+    "big-integer": "^1.6.48",
+    "bigint-buffer": "^1.1.5"
+  },
+  "devDependencies": {
+    "mocha": "^9.0.3"
+  },
+  "type": "module"
+}
