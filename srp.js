@@ -19,9 +19,7 @@ let calculateH2 = (username, password, salt) => {
 }
 
 export let calculateVerifier = (username, password, salt) => {
-    let I = username.toUpperCase()
-    let P = password.toUpperCase()
-    let h2 = calculateH2(I, P, salt)
+    let h2 = calculateH2(username, password, salt)
     let verifier = BigInteger(g).modPow(h2, N)
     return Buffer.from(verifier.value.toString(16).match(/.{2}/g).reverse().join(''), 'hex')
 }
