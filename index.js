@@ -3,15 +3,18 @@ import { REST } from '@discordjs/rest'
 import { SlashCommandBuilder } from '@discordjs/builders'
 import { InteractionResponseType, Routes } from 'discord-api-types/v9'
 import Sequelize from 'sequelize'
-import { makeRegistrationData } from './srp.js'
+import { calculateVerifier, makeRegistrationData } from './srp.js'
 
-const { DataTypes, Model } = Sequelize
+const { DataTypes, Model } = Sequelize;
 
 const maxAccountStr = 20
 const nameTooLong = `Account name can't be longer than ${maxAccountStr} characters, account not created!`
 const maxPassStr = 16
 const passTooLong = `Account password can't be longer than ${maxPassStr} characters, account not created!`
 const nameAlreadyExists = 'Account with this name already exists!'
+const passwordDoesntMatch = 'Password doesn\'t match!'
+const wrongPassword = 'Wrong password!'
+const passwordChanged = 'Password changed.'
 
 const token = process.env.DISCORD_BOT_TOKEN
 const clientId = process.env.DISCORD_CLIENT_ID
@@ -76,9 +79,16 @@ const account = new SlashCommandBuilder()
 	.addSubcommand(subcommand =>
 		subcommand
 			.setName('create')
-			.setDescription('Create an account')
+			.setDescription('Create account and set password to it.')
 			.addStringOption(option => option.setName('username').setDescription('Enter your username').setRequired(true))
 			.addStringOption(option => option.setName('password').setDescription('Enter your password').setRequired(true)))
+	.addSubcommand(subcommand =>
+		subcommand
+			.setName('password')
+			.setDescription('Change your account password.')
+			.addStringOption(option => option.setName('old').setDescription('Enter your old password').setRequired(true))
+			.addStringOption(option => option.setName('new').setDescription('Enter your new password').setRequired(true))
+			.addStringOption(option => option.setName('confirm').setDescription('Confirm your new password again').setRequired(true)))
 const commands = [account];
 
 (async () => {
@@ -96,8 +106,9 @@ const commands = [account];
   }
 })()
 
-client.on('ready', () => {
-  console.log(`Logged in as ${client.user.tag}!`)
+client.on('ready', async () => {
+	await User.sync()
+	console.log(`Logged in as ${client.user.tag}!`)
 })
 
 client.on('interactionCreate', async interaction => {
@@ -137,7 +148,6 @@ client.on('interactionCreate', async interaction => {
 			await account.save()
 			console.log(account.toJSON())
 
-			await User.sync()
 			let user = await User.findOne({ where: { userId: userId }})
 			if (user !== null) {
 				user.accountId = account.id
@@ -149,8 +159,34 @@ client.on('interactionCreate', async interaction => {
 			}
 			await user.save()
 			console.log(user.toJSON())
-
 			interaction.reply({ content: `Account created: ${username}`, ephemeral: true })
+		} else if (interaction.options.getSubcommand() === 'password') {
+			let user = await User.findOne({ where: { userId: interaction.member.user.id }})
+			let account = await Account.findByPk(user.accountId)
+			let oldPassword = interaction.options.getString('old')
+			let newPassword = interaction.options.getString('new')
+			let confirmPassword = interaction.options.getString('confirm')
+			let checkVerifier = calculateVerifier(account.username.toUpperCase(), oldPassword.toUpperCase(), account.salt)
+
+			if (!checkVerifier.equals(account.verifier)) {
+				interaction.reply({ content: wrongPassword, ephemeral: true })
+				return
+			}
+
+			if (newPassword !== confirmPassword) {
+				interaction.reply({ content: passwordDoesntMatch, ephemeral: true })
+				return
+			}
+
+			let I = account.username.toUpperCase()
+			let P = newPassword.toUpperCase()
+			let [salt, verifier] = makeRegistrationData(I, P)
+
+			account.salt = salt
+			account.verifier = verifier
+			await account.save()
+			console.log(account.toJSON())
+			interaction.reply({ content: passwordChanged, ephemeral: true })
 		}
 	}
 })
