@@ -12,6 +12,7 @@ const nameTooLong = `Account name can't be longer than ${maxAccountStr} characte
 const maxPassStr = 16
 const passTooLong = `Account password can't be longer than ${maxPassStr} characters, account not created!`
 const nameAlreadyExists = 'Account with this name already exists!'
+const accountExists = 'You already have an account'
 const passwordDoesntMatch = 'Password doesn\'t match!'
 const wrongPassword = 'Wrong password!'
 const passwordChanged = 'Password changed.'
@@ -119,6 +120,12 @@ client.on('interactionCreate', async interaction => {
 			let P = password.toUpperCase()
 			let userId = interaction.member.user.id;
 
+			let user = await User.findOne({ where: { userId: userId }})
+			if (user.accountId !== null) {
+				interaction.reply({ content: accountExists, ephemeral: true })
+				return
+			}
+
 			if (username.length > maxAccountStr) {
 				interaction.reply({ content: nameTooLong, ephemeral: true})
 				return
@@ -145,7 +152,6 @@ client.on('interactionCreate', async interaction => {
 			await account.save()
 			console.log(account.toJSON())
 
-			let user = await User.findOne({ where: { userId: userId }})
 			if (user !== null) {
 				user.accountId = account.id
 			} else {
