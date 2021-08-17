@@ -7,6 +7,12 @@ import { makeRegistrationData } from './srp.js'
 
 const { DataTypes, Model } = Sequelize
 
+const maxAccountStr = 20
+const nameTooLong = `Account name can't be longer than ${maxAccountStr} characters, account not created!`
+const maxPassStr = 16
+const passTooLong = `Account password can't be longer than ${maxPassStr} characters, account not created!`
+const nameAlreadyExists = 'Account with this name already exists!'
+
 const token = process.env.DISCORD_BOT_TOKEN
 const clientId = process.env.DISCORD_CLIENT_ID
 const guildId = process.env.DISCORD_GUILD_ID
@@ -17,8 +23,8 @@ const sequelize = new Sequelize('acore_auth', 'acore', 'acore', {
 	dialect: 'mysql'
 })
 
-class User extends Model {}
-User.init({
+class Account extends Model {}
+Account.init({
 	username: {
 		type: DataTypes.STRING(32)
 	},
@@ -80,17 +86,36 @@ client.on('interactionCreate', async interaction => {
 
 	if (interaction.commandName === 'account') {
 		if (interaction.options.getSubcommand() === 'create') {
-			const username = interaction.options.getString('username').toUpperCase()
-			const password = interaction.options.getString('password').toUpperCase()
-			let [salt, verifier] = makeRegistrationData(username, password)
-			const user = User.build({
+			let username = interaction.options.getString('username')
+			let password = interaction.options.getString('password')
+
+			if (username.length > maxAccountStr) {
+				interaction.reply({ content: nameTooLong, ephemeral: true})
+				return
+			}
+
+			if (password.length > maxPassStr) {
+				interaction.reply({ content: passTooLong, ephemeral: true})
+				return
+			}
+
+			let user = await Account.findOne({ where: { username: username }})
+			if (user !== null) {
+				interaction.reply({ content: nameAlreadyExists, ephemeral: true})
+				return
+			}
+
+			let [salt, verifier] = makeRegistrationData(username.toUpperCase(), password.toUpperCase())
+
+			user = Account.build({
 				username: username,
 				salt: salt,
 				verifier: verifier
 			})
 			await user.save()
 			console.log(user.toJSON())
-			interaction.reply({ content: 'Successfully created account ' + username + '!', ephemeral: true })
+
+			interaction.reply({ content: `Account created: ${username}`, ephemeral: true })
 		}
 	}
 })
