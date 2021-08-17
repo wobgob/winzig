@@ -121,7 +121,7 @@ client.on('interactionCreate', async interaction => {
 			let userId = interaction.member.user.id;
 
 			let user = await User.findOne({ where: { userId: userId }})
-			if (user.accountId !== null) {
+			if (user !== null && user.accountId !== null) {
 				interaction.reply({ content: accountExists, ephemeral: true })
 				return
 			}
