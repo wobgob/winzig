@@ -36,8 +36,27 @@ Account.init({
 	}
 }, {
 	sequelize,
+	modelName: 'account',
 	tableName: 'account',
 	timestamps: false
+})
+
+class User extends Model {}
+User.init({
+	userId: {
+		type: DataTypes.STRING
+	}
+}, {
+	sequelize,
+	modelName: 'user',
+	tableName: 'user',
+	timestamps: false
+})
+
+User.Account = User.belongsTo(Account, {
+	foreignKey: {
+		type: DataTypes.INTEGER.UNSIGNED
+	}
 })
 
 try {
@@ -88,6 +107,9 @@ client.on('interactionCreate', async interaction => {
 		if (interaction.options.getSubcommand() === 'create') {
 			let username = interaction.options.getString('username')
 			let password = interaction.options.getString('password')
+			let I = username.toUpperCase()
+			let P = password.toUpperCase()
+			let userId = interaction.member.user.id;
 
 			if (username.length > maxAccountStr) {
 				interaction.reply({ content: nameTooLong, ephemeral: true})
@@ -99,19 +121,32 @@ client.on('interactionCreate', async interaction => {
 				return
 			}
 
-			let user = await Account.findOne({ where: { username: username }})
-			if (user !== null) {
+			let account = await Account.findOne({ where: { username: I }})
+			if (account !== null) {
 				interaction.reply({ content: nameAlreadyExists, ephemeral: true})
 				return
 			}
 
-			let [salt, verifier] = makeRegistrationData(username.toUpperCase(), password.toUpperCase())
+			let [salt, verifier] = makeRegistrationData(I, P)
 
-			user = Account.build({
-				username: username,
+			account = Account.build({
+				username: I,
 				salt: salt,
 				verifier: verifier
 			})
+			await account.save()
+			console.log(account.toJSON())
+
+			await User.sync()
+			let user = await User.findOne({ where: { userId: userId }})
+			if (user !== null) {
+				user.accountId = account.id
+			} else {
+				user = User.build({
+					userId: userId,
+					accountId: account.id
+				})
+			}
 			await user.save()
 			console.log(user.toJSON())
 
