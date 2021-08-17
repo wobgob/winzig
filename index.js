@@ -21,10 +21,7 @@ const clientId = process.env.DISCORD_CLIENT_ID
 const guildId = process.env.DISCORD_GUILD_ID
 const client = new Client({ intents: [Intents.FLAGS.GUILDS] })
 const rest = new REST({ version: '9' }).setToken(token)
-const sequelize = new Sequelize('acore_auth', 'acore', 'acore', {
-	host: 'localhost',
-	dialect: 'mysql'
-})
+const sequelize = new Sequelize(process.env.DISCORD_BOT_DB)
 
 class Account extends Model {}
 Account.init({
