@@ -86,7 +86,7 @@ const account = new SlashCommandBuilder()
 			.setDescription('Change your account password.')
 			.addStringOption(option => option.setName('old').setDescription('Enter your old password').setRequired(true))
 			.addStringOption(option => option.setName('new').setDescription('Enter your new password').setRequired(true))
-			.addStringOption(option => option.setName('confirm').setDescription('Confirm your new password again').setRequired(true)))
+			.addStringOption(option => option.setName('again').setDescription('Enter your new password again').setRequired(true)))
 const commands = [account];
 
 (async () => {
@@ -168,7 +168,7 @@ client.on('interactionCreate', async interaction => {
 			let account = await Account.findByPk(user.accountId)
 			let oldPassword = interaction.options.getString('old')
 			let newPassword = interaction.options.getString('new')
-			let confirmPassword = interaction.options.getString('confirm')
+			let againPassword = interaction.options.getString('again')
 			let checkVerifier = calculateVerifier(account.username.toUpperCase(), oldPassword.toUpperCase(), account.salt)
 
 			if (!checkVerifier.equals(account.verifier)) {
@@ -176,7 +176,7 @@ client.on('interactionCreate', async interaction => {
 				return
 			}
 
-			if (newPassword !== confirmPassword) {
+			if (newPassword !== againPassword) {
 				interaction.reply({ content: passwordDoesntMatch, ephemeral: true })
 				return
 			}
