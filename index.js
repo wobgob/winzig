@@ -243,6 +243,18 @@ client.on('interactionCreate', async interaction => {
 				return
 			}
 
+			let account = await Account.findByPk(user.accountId)
+
+			if (account === null) {
+				interaction.reply({ content: accountNotFound, ephemeral: true })
+				return
+			}
+
+			if (account.online !== 0) {
+				interaction.reply({ content: logoff, ephemeral: true })
+				return
+			}
+
 			let name = interaction.options.getString('name')
 			let character = await Characters.findOne({ where: { name: name }})
 
