@@ -1,4 +1,5 @@
 import Sequelize from 'sequelize'
+import config from './config.js'
 
-export const AuthDb = new Sequelize(process.env.DISCORD_BOT_DB + '/acore_auth')
-export const CharactersDb = new Sequelize(process.env.DISCORD_BOT_DB + '/acore_characters')
+export const AuthDb = new Sequelize(config.DISCORD_BOT_DB + '/acore_auth')
+export const CharactersDb = new Sequelize(config.DISCORD_BOT_DB + '/acore_characters')

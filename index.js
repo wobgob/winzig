@@ -1,13 +1,14 @@
 import { Client, Intents } from 'discord.js'
 import { REST } from '@discordjs/rest'
 import { SlashCommandBuilder } from '@discordjs/builders'
-import { InteractionResponseType, Routes } from 'discord-api-types/v9'
+import { Routes } from 'discord-api-types/v9'
 import { calculateVerifier, makeRegistrationData } from './srp.js'
 import { AtLoginFlags } from './character-tools.js'
 import { Account } from './models/account.js'
 import { User } from './models/user.js'
 import { Characters } from './models/characters.js'
 import { AuthDb, CharactersDb } from './db.js'
+import config from './config.js'
 
 const maxAccountStr = 20
 const nameTooLong = `Account name can't be longer than ${maxAccountStr} characters, account not created!`
@@ -25,9 +26,9 @@ const nameTaken = 'Name already taken.'
 const accountNotFound = 'Account not found!'
 const logoff = 'You must logoff before performing this action.'
 
-const token = process.env.DISCORD_BOT_TOKEN
-const clientId = process.env.DISCORD_CLIENT_ID
-const guildId = process.env.DISCORD_GUILD_ID
+const token = config.DISCORD_BOT_TOKEN
+const clientId = config.DISCORD_CLIENT_ID
+const guildId = config.DISCORD_GUILD_ID
 const client = new Client({ intents: [Intents.FLAGS.GUILDS] })
 const rest = new REST({ version: '9' }).setToken(token)
 
@@ -49,7 +50,7 @@ const account = new SlashCommandBuilder()
 	.addSubcommand(subcommand =>
 		subcommand
 			.setName('create')
-			.setDescription('Create account and set password to it.')
+			.setDescription('Create account and set a password to it.')
 			.addStringOption(option => option.setName('username').setDescription('Enter your username').setRequired(true))
 			.addStringOption(option => option.setName('password').setDescription('Enter your password').setRequired(true)))
 	.addSubcommand(subcommand =>
