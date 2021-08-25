@@ -190,6 +190,11 @@ client.on('interactionCreate', async interaction => {
 				return
 			}
 
+			if (password.length > maxPassStr) {
+				interaction.reply({ content: passTooLong, ephemeral: true})
+				return
+			}
+
 			if (newPassword !== againPassword) {
 				interaction.reply({ content: passwordDoesntMatch, ephemeral: true })
 				return
