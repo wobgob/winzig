@@ -2,13 +2,19 @@ import { Client, Intents } from 'discord.js'
 import { REST } from '@discordjs/rest'
 import { SlashCommandBuilder } from '@discordjs/builders'
 import { Routes } from 'discord-api-types/v9'
+import Email from 'email-templates'
+import sequelize from 'sequelize'
+import nodemailer from 'nodemailer'
 import { calculateVerifier, makeRegistrationData } from './srp.js'
 import { AtLoginFlags } from './character-tools.js'
 import { Account } from './models/account.js'
 import { User } from './models/user.js'
+import { Reset } from './models/reset.js'
 import { Characters } from './models/characters.js'
 import { AuthDb, CharactersDb } from './db.js'
 import config from './config.js'
+
+const { Op } = sequelize
 
 const maxAccountStr = 20
 const nameTooLong = `Account name can't be longer than ${maxAccountStr} characters, account not created!`
@@ -17,7 +23,7 @@ const passTooLong = `Account password can't be longer than ${maxPassStr} charact
 const nameAlreadyExists = 'Account with this name already exists!'
 const accountExists = 'You already have an account.'
 const passwordDoesntMatch = 'Password doesn\'t match!'
-const wrongPassword = 'Wrong password!'
+const wrongCode = 'Wrong code!'
 const passwordChanged = 'Password changed.'
 const characterDoesntExist = 'Character does not exist!'
 const createAccount = 'Please create an account.'
@@ -25,6 +31,11 @@ const flagged = 'Character flagged for customisation.'
 const nameTaken = 'Name already taken.'
 const accountNotFound = 'Account not found!'
 const logoff = 'You must logoff before performing this action.'
+const invalidEmail = 'Enter a valid email address.'
+const emailSent = 'Email sent! If you do not receive it check your junk folder.'
+const emailNotSent = `Email not sent! Contact a ${config.COMPANY} staff member.`
+const tooSoon = 'You must wait 5 minutes between reset attempts.'
+const resetInactive = 'No password reset in progress.'
 
 const token = config.DISCORD_BOT_TOKEN
 const clientId = config.DISCORD_CLIENT_ID
@@ -57,9 +68,14 @@ const account = new SlashCommandBuilder()
 		subcommand
 			.setName('password')
 			.setDescription('Change your account password.')
-			.addStringOption(option => option.setName('old').setDescription('Enter your old password').setRequired(true))
+			.addStringOption(option => option.setName('code').setDescription('Enter your code').setRequired(true))
 			.addStringOption(option => option.setName('new').setDescription('Enter your new password').setRequired(true))
 			.addStringOption(option => option.setName('again').setDescription('Enter your new password again').setRequired(true)))
+	.addSubcommand(subcommand =>
+		subcommand
+			.setName('reset')
+			.setDescription('Reset your password.')
+			.addStringOption(option => option.setName('email').setDescription('Enter your email address').setRequired(true)))
 const character = new SlashCommandBuilder()
 	.setName('services')
 	.setDescription('Character services.')
@@ -98,6 +114,7 @@ const commands = [account, character];
 
 client.on('ready', async () => {
 	await User.sync()
+	await Reset.sync()
 	console.log(`Logged in as ${client.user.tag}!`)
 })
 
@@ -158,13 +175,18 @@ client.on('interactionCreate', async interaction => {
 		} else if (interaction.options.getSubcommand() === 'password') {
 			let user = await User.findOne({ where: { userId: interaction.member.user.id }})
 			let account = await Account.findByPk(user.accountId)
-			let oldPassword = interaction.options.getString('old')
+			let reset = await Reset.findOne({ where: { userId: user.id }})
+			let code = interaction.options.getString('code')
 			let newPassword = interaction.options.getString('new')
 			let againPassword = interaction.options.getString('again')
-			let checkVerifier = calculateVerifier(account.username.toUpperCase(), oldPassword.toUpperCase(), account.salt)
 
-			if (!checkVerifier.equals(account.verifier)) {
-				interaction.reply({ content: wrongPassword, ephemeral: true })
+			if (reset === null || reset.updatedAt < (new Date() - 60 * 60 * 1000)) {
+				interaction.reply({ content: resetInactive, ephemeral: true })
+				return
+			}
+
+			if (reset.code !== code) {
+				interaction.reply({ content: wrongCode, ephemeral: true })
 				return
 			}
 
@@ -182,6 +204,86 @@ client.on('interactionCreate', async interaction => {
 			await account.save()
 			console.log(account.toJSON())
 			interaction.reply({ content: passwordChanged, ephemeral: true })
+		} else if (interaction.options.getSubcommand() === 'reset') {
+			let address = interaction.options.getString('email')
+			let validEmail = (email) => {
+				const re = /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
+				return re.test(String(email).toLowerCase());
+			}
+
+			if (!validEmail(address)) {
+				interaction.reply({ content: invalidEmail, ephemeral: true })
+				return
+			}
+
+			let userId = interaction.member.user.id
+			let user = await User.findOne({ where: { userId: userId }})
+
+			if (user === null || user.accountId === null) {
+				interaction.reply({ content: createAccount, ephemeral: true })
+				return
+			}
+
+			let reset = await Reset.findOne({
+				where: {
+					userId: user.id,
+				}
+			})
+
+			if (reset !== null && reset.updatedAt > (new Date() - 5 * 60 * 1000)) {
+				interaction.reply({ content: tooSoon, ephemeral: true })
+				return
+			}
+			
+			let transport = nodemailer.createTransport({
+				host: config.SMTP_HOST,
+				port: 587,
+				secure: false,
+				auth: {
+					user: config.SMTP_USER,
+					pass: config.SMTP_PASS
+				}
+			})
+
+			let email = new Email({
+				message: {
+					from: config.EMAIL_ADDRESS
+				},
+				send: true,
+				transport: transport
+			})
+
+			let code = Math.random().toString(10).slice(2, 8)
+			let account = await Account.findByPk(user.accountId)
+
+			email.send({
+				template: 'reset',
+				message: {
+					to: address
+				},
+				locals: {
+					name: account.username,
+					company: config.COMPANY,
+					website: config.WEBSITE,
+					code: code
+				}
+			}).then(console.log).catch((err) => {
+				console.error(err)
+				interaction.reply({ content: emailNotSent, ephemeral: true })
+				return
+			})
+			
+			if (reset === null) {
+				reset = Reset.build({
+					code: code,
+					userId: user.id,
+				})
+			} else {
+				reset.code = code
+			}
+			await reset.save()
+
+			interaction.reply({ content: emailSent, ephemeral: true })
 		}
 	}
 
