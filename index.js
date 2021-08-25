@@ -87,6 +87,11 @@ const character = new SlashCommandBuilder()
 			.addStringOption(option => option.setName('new').setDescription('Enter your new character name').setRequired(true)))
 	.addSubcommand(subcommand =>
 		subcommand
+			.setName('customise')
+			.setDescription('Change a character\'s appearance or gender.')
+			.addStringOption(option => option.setName('name').setDescription('Enter your character\'s name').setRequired(true)))
+	.addSubcommand(subcommand =>
+		subcommand
 			.setName('race-change')
 			.setDescription('Change a character\'s race (within your current faction).')
 			.addStringOption(option => option.setName('name').setDescription('Enter your character\'s name').setRequired(true)))
@@ -339,7 +344,7 @@ client.on('interactionCreate', async interaction => {
 		}
 
 		let isFlag = (subcommand) => {
-			return subcommand == 'race-change' || subcommand == 'faction-change'
+			return subcommand === 'customise' || subcommand === 'race-change' || subcommand === 'faction-change'
 		}
 
 		if (isFlag(subcommand)) {
@@ -371,10 +376,12 @@ client.on('interactionCreate', async interaction => {
 				return
 			}
 
-			if (subcommand == 'race-change') {
-				character.atLogin = AtLoginFlags.AT_LOGIN_CHANGE_RACE;
-			} else if (subcommand == 'faction-change') {
-				character.atLogin = AtLoginFlags.AT_LOGIN_CHANGE_FACTION;
+			if (subcommand === 'customise') {
+				character.atLogin = AtLoginFlags.AT_LOGIN_CUSTOMIZE
+			} else if (subcommand === 'race-change') {
+				character.atLogin = AtLoginFlags.AT_LOGIN_CHANGE_RACE
+			} else if (subcommand === 'faction-change') {
+				character.atLogin = AtLoginFlags.AT_LOGIN_CHANGE_FACTION
 			}
 
 			await character.save()
