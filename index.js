@@ -5,7 +5,7 @@ import { Routes } from 'discord-api-types/v9'
 import Email from 'email-templates'
 import sequelize from 'sequelize'
 import nodemailer from 'nodemailer'
-import { calculateVerifier, makeRegistrationData } from './srp.js'
+import { makeRegistrationData } from './srp.js'
 import { AtLoginFlags } from './character-tools.js'
 import { Account } from './models/account.js'
 import { User } from './models/user.js'
@@ -69,7 +69,7 @@ const account = new SlashCommandBuilder()
 			.setName('password')
 			.setDescription('Change your account password.')
 			.addStringOption(option => option.setName('code').setDescription('Enter your code').setRequired(true))
-			.addStringOption(option => option.setName('new').setDescription('Enter your new password').setRequired(true))
+			.addStringOption(option => option.setName('password').setDescription('Enter your new password').setRequired(true))
 			.addStringOption(option => option.setName('again').setDescription('Enter your new password again').setRequired(true)))
 	.addSubcommand(subcommand =>
 		subcommand
@@ -177,7 +177,7 @@ client.on('interactionCreate', async interaction => {
 			let account = await Account.findByPk(user.accountId)
 			let reset = await Reset.findOne({ where: { userId: user.id }})
 			let code = interaction.options.getString('code')
-			let newPassword = interaction.options.getString('new')
+			let newPassword = interaction.options.getString('password')
 			let againPassword = interaction.options.getString('again')
 
 			if (reset === null || reset.updatedAt < (new Date() - 60 * 60 * 1000)) {
@@ -190,7 +190,7 @@ client.on('interactionCreate', async interaction => {
 				return
 			}
 
-			if (password.length > maxPassStr) {
+			if (newPassword.length > maxPassStr) {
 				interaction.reply({ content: passTooLong, ephemeral: true})
 				return
 			}
