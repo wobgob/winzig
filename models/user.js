@@ -13,7 +13,8 @@ User.init({
 }, {
 	sequelize,
 	modelName: 'user',
-	tableName: 'user'
+	tableName: 'user',
+	timestamps: false
 })
 
 User.Account = User.belongsTo(Account, {
