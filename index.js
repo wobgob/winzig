@@ -3,15 +3,16 @@ import { REST } from '@discordjs/rest'
 import { SlashCommandBuilder } from '@discordjs/builders'
 import { Routes } from 'discord-api-types/v9'
 import Email from 'email-templates'
-import sequelize from 'sequelize'
+import sequelize, { Sequelize } from 'sequelize'
 import nodemailer from 'nodemailer'
 import { makeRegistrationData } from './srp.js'
 import { AtLoginFlags } from './character-tools.js'
-import { Account } from './models/account.js'
-import { User } from './models/user.js'
-import { Reset } from './models/reset.js'
-import { Characters } from './models/characters.js'
-import { AuthDb, CharactersDb } from './db.js'
+import { Account } from './models/prod/account.js'
+import { User } from './models/prod/user.js'
+import { Reset } from './models/prod/reset.js'
+import * as Live from './models/prod/characters.js'
+import * as Test from './models/test/characters.js'
+import { AuthDb, CharactersDb, TestCharactersDb } from './db.js'
 import config from './config.js'
 
 const { Op } = sequelize
@@ -36,6 +37,7 @@ const emailSent = 'Email sent! If you do not receive it check your junk folder.'
 const emailNotSent = `Email not sent! Contact a ${config.COMPANY} staff member.`
 const tooSoon = 'You must wait 5 minutes between reset attempts.'
 const resetInactive = 'No password reset in progress.'
+const transferError = 'We could not complete the transfer.'
 
 const token = config.DISCORD_BOT_TOKEN
 const clientId = config.DISCORD_CLIENT_ID
@@ -43,9 +45,26 @@ const guildId = config.DISCORD_GUILD_ID
 const client = new Client({ intents: [Intents.FLAGS.GUILDS] })
 const rest = new REST({ version: '9' }).setToken(token)
 
+const CharTable = [
+	'CharacterAccountData', 'CharacterAchievement', 'CharacterAchievementProgress', 'CharacterAction',
+	'CharacterAura', 'CharacterDeclinedName', 'CharacterEquipmentSets', 'CharacterGlyphs',
+	'CharacterHomebind', 'CharacterQuestStatus', 'CharacterQuestStatusRewarded', 'CharacterReputation',
+	'CharacterSkills', 'CharacterSpell', 'CharacterSpellCooldown', 'CharacterTalent'
+]
+const EqSetTable = ['CharacterEquipmentSets']
+const Inventory = ['CharacterInventory']
+const Pet = ['CharacterPet', 'CharacterPetDeclinedName']
+const Mail = ['Mail']
+const MailItems = ['MailItems']
+const PetTable = ['PetAura', 'PetSpell', 'PetSpellCooldown']
+const Item = ['ItemInstance']
+const ItemGift = ['CharacterGifts']
+
 try {
 	await AuthDb.authenticate()
 	await CharactersDb.authenticate()
+	await TestCharactersDb.authenticate()
+
 	console.log('Connection has been established successfully.')
 } catch (error) {
 	console.error('Unable to connect to the database:', error)
@@ -100,7 +119,17 @@ const character = new SlashCommandBuilder()
 			.setName('faction-change')
 			.setDescription('Change a character\'s faction (Horde to Alliance or Alliance to Horde).')
 			.addStringOption(option => option.setName('name').setDescription('Enter your character\'s name').setRequired(true)))
-const commands = [account, character];
+	.addSubcommand(subcommand =>
+		subcommand
+			.setName('test')
+			.setDescription('Transfer a character to the test realm.')
+			.addStringOption(option => option.setName('name').setDescription('Enter your character name').setRequired(true)))
+const transfer = new SlashCommandBuilder()
+	.setName('transfer')
+	.setDescription('Transfer a character to the live realm.')
+	.setDefaultPermission(false)
+	.addStringOption(option => option.setName('name').setDescription('Enter your character name').setRequired(true))
+const commands = [account, character, transfer];
 
 (async () => {
   try {
@@ -300,7 +329,170 @@ client.on('interactionCreate', async interaction => {
 	if (interaction.commandName === 'services') {
 		let subcommand = interaction.options.getSubcommand()
 
-		if (subcommand == 'name-change') {
+		if (subcommand === 'live') {
+			let userId = interaction.member.user.id;
+			let user = await User.findOne({ where: { userId: userId }})
+
+			if (user === null || user.accountId === null) {
+				interaction.reply({ content: createAccount, ephemeral: true })
+				return
+			}
+
+			let account = await Account.findByPk(user.accountId)
+
+			if (account === null) {
+				interaction.reply({ content: accountNotFound, ephemeral: true })
+				return
+			}
+
+			if (account.online !== 0) {
+				interaction.reply({ content: logoff, ephemeral: true })
+				return
+			}
+
+			let name = interaction.options.getString('name')
+			let character = await Test.Characters.findOne({ where: { name: name }})
+
+			if (character === null || character.account !== user.accountId) {
+				interaction.reply({ content: characterDoesntExist, ephemeral: true })
+				return
+			}
+
+			try {
+				await sequelize.Transaction(async (t) => {
+					let guid = Live.Characters.max('guid') + 1
+
+					character.guid = guid
+					await Live.Characters.create(character)
+
+					for (table in CharTable) {
+						let row = Test[table].findOne({ where: { guid: character.guid }})
+
+						if (row !== null) {
+							row.guid = guid
+							await Live[table].create(row)
+						}
+					}
+
+					for (table in EqSetTable) {
+						let rows = Test[table].findAll({ where: { guid: character.guid }})
+
+						for (row in rows) {
+							row.guid = guid
+							row.setguid = Live.CharacterEquipmentSets.max('setguid') + 1
+							await Live[table].create(row)
+						}
+					}
+
+					for (table in Inventory) {
+						let rows = Test[table].findAll({
+							where: { guid: character.guid },
+							order: [['bag', 'ASC']]
+						})
+
+						let prev = 0
+						let bag = 0
+						for (row in rows) {
+							if (prev != row.bag) {
+								prev = row.bag
+								bag = Live[table].max('bag') + 1
+							}
+
+							row.guid = guid
+							row.bag = bag
+
+							let item = Test.ItemInstance.findByPk(row.item)
+							let itemGuid = Live.ItemInstance.max('guid') + 1
+
+							item.id = itemGuid
+							item.guid = guid
+							await Live.ItemInstance.create(item)
+
+							row.item = itemGuid
+							await Live[table].create(row)
+						}
+					}
+
+					for (table in ItemGift) {
+						let rows = Test[table].findAll({ where: { guid: character.guid }})
+
+						for (row in rows) {
+							let item = Test.ItemInstance.findByPk(row.item)
+							let itemGuid = Live.ItemInstance.max('guid') + 1
+
+							item.id = itemGuid
+							item.guid = guid
+							await Live.ItemInstance.create(item)
+
+							row.id = itemGuid
+							row.guid = guid
+							await Live[table].create(row)
+						}
+					}
+
+					for (table in Pet) {
+						let rows = Test[table].findAll({ where: { guid: guid }})
+
+						for (row in rows) {
+							row.id = Live[table].max('id') + 1
+							row.guid = guid
+							await Live[table].create(row)
+
+							for (table in PetTable) {
+								let pet = Test[table].findAll({
+									where: { id: row.id }
+								})
+
+								for (p in pet) {
+									p.id = row.id
+									await Live[table].create(p)
+								}
+							}
+						}
+					}
+
+					for (table in Mail) {
+						let rows = Test[table].findAll({ where: { guid: guid }})
+
+						for (row in rows) {
+							let mailId = row.id
+
+							row.id = Live[table].max('id') + 1
+							row.guid = guid
+
+							let items = Test.MailItems.findAll({
+								where: {
+									mailId: mailId,
+									guid: guid
+								}
+							})
+
+							for (item in items) {
+								let instance = Test.ItemInstance.findByPk(item.itemId)
+								let itemGuid = Live.ItemInstance.max('guid') + 1
+
+								instance.id = itemGuid
+								instance.guid = guid
+								await Live.ItemInstance.create(item)
+
+								item.itemGuid = itemGuid
+								item.guid = guid
+								item.mailId = mailId
+								await Live.MailItems.create(row)
+							}
+
+							await Live[table].create(row)
+						}
+					}
+				})
+			} catch(err) {
+				console.log(err)
+				interaction.reply({ content: transferError, ephemeral: true })
+				return
+			}
+		}
+
+		if (subcommand === 'name-change') {
 			let userId = interaction.member.user.id;
 			let user = await User.findOne({ where: { userId: userId }})
 
@@ -322,7 +514,7 @@ client.on('interactionCreate', async interaction => {
 			}
 
 			let oldName = interaction.options.getString('old')
-			let character = await Characters.findOne({ where: { name: oldName }})
+			let character = await Live.Characters.findOne({ where: { name: oldName }})
 
 			if (character === null || character.account !== user.accountId) {
 				interaction.reply({ content: characterDoesntExist, ephemeral: true })
@@ -330,7 +522,7 @@ client.on('interactionCreate', async interaction => {
 			}
 
 			let newName = interaction.options.getString('new')
-			let other = await Characters.findOne({ where: {name: newName }})
+			let other = await Live.Characters.findOne({ where: {name: newName }})
 
 			if (other !== null) {
 				interaction.reply({ content: nameTaken, ephemeral: true })
@@ -369,7 +561,7 @@ client.on('interactionCreate', async interaction => {
 			}
 
 			let name = interaction.options.getString('name')
-			let character = await Characters.findOne({ where: { name: name }})
+			let character = await Live.Characters.findOne({ where: { name: name }})
 
 			if (character === null || character.account !== user.accountId) {
 				interaction.reply({ content: characterDoesntExist, ephemeral: true })

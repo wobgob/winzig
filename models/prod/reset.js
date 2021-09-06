@@ -1,5 +1,5 @@
 import Sequelize from 'sequelize'
-import { AuthDb } from '../db.js'
+import { AuthDb } from '../../db.js'
 import { User } from './user.js'
 
 const { DataTypes, Model } = Sequelize;
