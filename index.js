@@ -131,7 +131,8 @@ const copy = new SlashCommandBuilder()
 	.setName('copy')
 	.setDescription('Copy a character to the live realm.')
 	.setDefaultPermission(false)
-	.addStringOption(option => option.setName('name').setDescription('Enter your character name').setRequired(true))
+	.addIntegerOption(option => option.setName('account-id').setDescription('Enter the account ID').setRequired(true))
+	.addStringOption(option => option.setName('name').setDescription('Enter the character name').setRequired(true))
 const commands = [account, character, copy];
 
 const ROLE = 1
@@ -348,15 +349,7 @@ client.on('interactionCreate', async interaction => {
 	}
 
 	if (interaction.commandName === 'copy') {
-		let userId = interaction.member.user.id;
-		let user = await live.auth.user.findOne({ where: { userId: userId }})
-
-		if (user === null || user.accountId === null) {
-			interaction.reply({ content: createAccount, ephemeral: true })
-			return
-		}
-
-		let account = await live.auth.account.findByPk(user.accountId)
+		let account = await live.auth.account.findByPk(interactions.options.getInteger('account-id'))
 
 		if (account === null) {
 			interaction.reply({ content: accountNotFound, ephemeral: true })
