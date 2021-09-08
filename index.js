@@ -349,7 +349,7 @@ client.on('interactionCreate', async interaction => {
 	}
 
 	if (interaction.commandName === 'copy') {
-		let account = await live.auth.account.findByPk(interactions.options.getInteger('account-id'))
+		let account = await live.auth.account.findByPk(interaction.options.getInteger('account-id'))
 
 		if (account === null) {
 			interaction.reply({ content: accountNotFound, ephemeral: true })
