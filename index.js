@@ -42,31 +42,12 @@ const emailSent = 'Email sent! If you do not receive it check your junk folder.'
 const emailNotSent = `Email not sent! Contact a ${config.COMPANY} staff member.`
 const tooSoon = 'You must wait 5 minutes between reset attempts.'
 const resetInactive = 'No password reset in progress.'
-const copyError = 'We could not complete the character copy.'
-const copySuccess = 'We have completed the character copy.'
 
 const token = config.DISCORD_BOT_TOKEN
 const clientId = config.DISCORD_CLIENT_ID
 const guildId = config.DISCORD_GUILD_ID
 const client = new Client({ intents: [Intents.FLAGS.GUILDS] })
 const rest = new REST({ version: '9' }).setToken(token)
-
-const CharTable = [
-	'character_account_data', 'character_achievement',
-	'character_achievement_progress', 'character_action', 'character_aura',
-	'character_declinedname', 'character_glyphs', 'character_homebind',
-	'character_queststatus', 'character_queststatus_rewarded',
-	'character_reputation', 'character_skills', 'character_spell',
-	'character_spell_cooldown', 'character_talent'
-]
-const EqSetTable = ['character_equipmentsets']
-const Inventory = ['character_inventory']
-const Pet = ['character_pet', 'character_pet_declinedname']
-const Mail = ['mail']
-const MailItems = ['mail_items']
-const PetTable = ['pet_aura', 'pet_spell', 'pet_spell_cooldown']
-const Item = ['item_instance']
-const ItemGift = ['character_gifts']
 
 try {
 	await AuthDb.authenticate()
@@ -127,14 +108,9 @@ const character = new SlashCommandBuilder()
 			.setName('faction-change')
 			.setDescription('Change a character\'s faction (Horde to Alliance or Alliance to Horde).')
 			.addStringOption(option => option.setName('name').setDescription('Enter your character\'s name').setRequired(true)))
-const copy = new SlashCommandBuilder()
-	.setName('copy')
-	.setDescription('Copy a character to the live realm.')
-	.setDefaultPermission(false)
-	.addIntegerOption(option => option.setName('account-id').setDescription('Enter the account ID').setRequired(true))
-	.addStringOption(option => option.setName('name').setDescription('Enter the character name').setRequired(true))
-const commands = [account, character, copy];
+const commands = [account, character];
 
+const restricted = []
 const ROLE = 1
 const permissions = {
 	permissions: [
@@ -159,12 +135,14 @@ const permissions = {
 	  Routes.applicationGuildCommands(clientId, guildId)
 	)
 
-	let cmd = cmds.find(c => c.name === 'copy')
-
-	await rest.put(
-		Routes.applicationCommandPermissions(clientId, guildId, cmd.id),
-		{ body: permissions }
-	)
+	for (let cmd in cmds) {
+		if (restricted.includes(cmd.name)) {
+			await rest.put(
+				Routes.applicationCommandPermissions(clientId, guildId, cmd.id),
+				{ body: permissions }
+			)
+		}
+	}
 
     console.log('Successfully reloaded application (/) commands.')
   } catch (error) {
@@ -345,212 +323,6 @@ client.on('interactionCreate', async interaction => {
 			await reset.save()
 
 			interaction.reply({ content: emailSent, ephemeral: true })
-		}
-	}
-
-	if (interaction.commandName === 'copy') {
-		let accountId = interaction.options.getInteger('account-id')
-		let account = await live.auth.account.findByPk(accountId)
-
-		if (account === null) {
-			interaction.reply({ content: accountNotFound, ephemeral: true })
-			return
-		}
-
-		if (account.online !== 0) {
-			interaction.reply({ content: logoff, ephemeral: true })
-			return
-		}
-
-		let toTitleCase = phrase => {
-			return phrase
-				.toLowerCase()
-				.split(' ')
-				.map(word => word.charAt(0).toUpperCase() + word.slice(1))
-				.join(' ')
-		}
-		let name = toTitleCase(interaction.options.getString('name'))
-		let character = await test.characters.characters.findOne({
-			where: { name: name },
-			raw: true
-		})
-
-		if (character === null || character.account !== accountId) {
-			interaction.reply({ content: characterDoesntExist, ephemeral: true })
-			return
-		}
-
-		try {
-			await CharactersDb.transaction(async (t) => {
-				let itemInstances = []
-				let guid = await live.characters.characters.max('guid', { transaction: t }) + 1
-				let copy = Object.assign({}, character)
-
-				copy.guid = guid
-				await live.characters.characters.create(copy, { transaction: t })
-
-				for (let table of CharTable) {
-					let row = await test.characters[table].findOne({
-						where: { guid: character.guid },
-						raw: true
-					})
-
-					if (row !== null) {
-						row.guid = guid
-						await live.characters[table].create(row, { transaction: t})
-					}
-				}
-
-				for (let table of EqSetTable) {
-					let rows = await test.characters[table].findAll({
-						where: { guid: character.guid },
-						raw: true
-					})
-
-					for (let row of rows) {
-						row.guid = guid
-						row.setguid = await live.characters.character_equipmentsets.max('setguid', { transaction: t }) + 1
-						await live.characters[table].create(row, { transaction: t })
-					}
-				}
-
-				for (let table of Inventory) {
-					let rows = await test.characters[table].findAll({
-						where: { guid: character.guid },
-						order: [['bag', 'ASC']],
-						raw: true
-					})
-
-					let prev = 0
-					let bag = 0
-					for (let row of rows) {
-						if (prev != row.bag) {
-							prev = row.bag
-							bag = await live.characters[table].max('bag', { transaction: t }) + 1
-						}
-
-						let item = await test.characters.item_instance.findByPk(row.item, { raw: true })
-						let itemGuid = await live.characters.item_instance.max('guid', { transaction: t }) + 1
-						itemInstances.push(itemGuid)
-
-						item.guid = itemGuid
-						item.owner_guid = guid
-						await live.characters.item_instance.create(item, { transaction: t })
-
-						row.guid = guid
-						row.bag = bag
-						row.item = itemGuid
-						await live.characters[table].create(row, { transaction: t })
-					}
-				}
-
-				for (let table of ItemGift) {
-					let rows = await test.characters[table].findAll({
-						where: { guid: character.guid },
-						raw: true
-					})
-
-					for (let row of rows) {
-						let item = await test.characters.item_instance.findByPk(row.item)
-						let itemGuid = await live.characters.item_instance.max('guid', { transaction: t }) + 1
-						itemInstances.push(itemGuid)
-
-						item.guid = itemGuid
-						item.owner_guid = guid
-						await live.characters.item_instance.create(item, { transaction: t })
-
-						row.guid = guid
-						row.item_id = itemGuid
-						await live.characters[table].create(row, { transaction: t })
-					}
-				}
-
-				for (let table of Pet) {
-					let rows = await test.characters[table].findAll({
-						where: { owner: character.guid },
-						raw: true
-					})
-
-					for (let row of rows) {
-						row.id = await live.characters[table].max('id', { transaction: t }) + 1
-						row.owner = guid
-						await live.characters[table].create(row, { transaction: t })
-
-						for (let table of PetTable) {
-							let pet = await test.characters[table].findAll({
-								where: { id: row.id },
-								raw: true
-							})
-
-							for (let p of pet) {
-								p.id = row.id
-								await live.characters[table].create(p, { transaction: t })
-							}
-						}
-					}
-				}
-
-				for (let table of Mail) {
-					let rows = await test.characters[table].findAll({
-						where: { receiver: guid },
-						raw: true
-					})
-
-					for (let row of rows) {
-						let mailId = row.id
-
-						row.id = await live.characters[table].max('id', { transaction: t }) + 1
-						row.receiver = guid
-
-						for (let mailItems of MailItems) {
-							let items = await test.characters[mailItems].findAll({
-								where: {
-									mail_id: mailId,
-									receiver: guid
-								},
-								raw: true
-							})
-
-							for (let item of items) {
-								let instance = await test.characters.item_instance.findByPk(item.guid, { raw: true })
-								let itemGuid = await live.characters.item_instance.max('guid', { transaction: t }) + 1
-								itemInstances.push(itemGuid)
-
-								instance.guid = itemGuid
-								instance.owner_guid = guid
-								await live.characters.item_instance.create(item, { transaction: t })
-
-								item.mail_id = mailId
-								item.item_guid = itemGuid
-								item.receiver = guid
-								await live.characters[mailItems].create(row, { transaction: t })
-							}
-						}
-						await live.characters[table].create(row, { transaction: t })
-					}
-				}
-
-				for (let table of Item) {
-					let rows = await test.characters[table].findAll({
-						where: { guid: guid },
-						raw: true
-					})
-					let items = rows.filter(item => !itemInstances.includes(item.guid))
-
-					for (let item of items) {
-						item.guid = await live.characters.item_instance.max('guid', { transaction: t }) + 1
-						item.owner_guid = guid
-						await live.characters.item_instance.create(item, { transaction: t })
-					}
-				}
-			})
-
-			interaction.reply({ content: copySuccess, ephemeral: true })
-			return
-		} catch(err) {
-			console.log(err)
-			interaction.reply({ content: copyError, ephemeral: true })
-			return
 		}
 	}
 
