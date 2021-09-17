@@ -16,3 +16,5 @@ config.js:
 ```
 
 Then run `npm install` followed by `npm run build`.
+
+Use [`sequelize-auto`](https://github.com/sequelize/sequelize-auto) to auto generate models.

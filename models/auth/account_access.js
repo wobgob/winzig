@@ -1,31 +1,33 @@
 import _sequelize from 'sequelize';
 const { Model, Sequelize } = _sequelize;
 
-export default class user extends Model {
+export default class account_access extends Model {
   static init(sequelize, DataTypes) {
   super.init({
     id: {
-      autoIncrement: true,
-      type: DataTypes.INTEGER,
+      type: DataTypes.INTEGER.UNSIGNED,
       allowNull: false,
       primaryKey: true
     },
-    userId: {
-      type: DataTypes.STRING(255),
-      allowNull: true
+    gmlevel: {
+      type: DataTypes.TINYINT.UNSIGNED,
+      allowNull: false
     },
-    accountId: {
-      type: DataTypes.INTEGER.UNSIGNED,
+    RealmID: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: -1,
+      primaryKey: true
+    },
+    comment: {
+      type: DataTypes.STRING(255),
       allowNull: true,
-      references: {
-        model: 'account',
-        key: 'id'
-      }
+      defaultValue: ""
     }
   }, {
     sequelize,
-    tableName: 'user',
-    timestamps: true,
+    tableName: 'account_access',
+    timestamps: false,
     indexes: [
       {
         name: "PRIMARY",
@@ -33,17 +35,11 @@ export default class user extends Model {
         using: "BTREE",
         fields: [
           { name: "id" },
-        ]
-      },
-      {
-        name: "accountId",
-        using: "BTREE",
-        fields: [
-          { name: "accountId" },
+          { name: "RealmID" },
         ]
       },
     ]
   });
-  return user;
+  return account_access;
   }
 }

@@ -1,7 +1,9 @@
-import _sequelize from 'sequelize';
-const { Model, Sequelize } = _sequelize;
+const Sequelize = require('sequelize');
+module.exports = (sequelize, DataTypes) => {
+  return reset.init(sequelize, DataTypes);
+}
 
-export default class user extends Model {
+class reset extends Sequelize.Model {
   static init(sequelize, DataTypes) {
   super.init({
     id: {
@@ -10,21 +12,21 @@ export default class user extends Model {
       allowNull: false,
       primaryKey: true
     },
-    userId: {
-      type: DataTypes.STRING(255),
+    code: {
+      type: DataTypes.STRING(6),
       allowNull: true
     },
-    accountId: {
-      type: DataTypes.INTEGER.UNSIGNED,
+    userId: {
+      type: DataTypes.INTEGER,
       allowNull: true,
       references: {
-        model: 'account',
+        model: 'user',
         key: 'id'
       }
     }
   }, {
     sequelize,
-    tableName: 'user',
+    tableName: 'reset',
     timestamps: true,
     indexes: [
       {
@@ -36,14 +38,14 @@ export default class user extends Model {
         ]
       },
       {
-        name: "accountId",
+        name: "userId",
         using: "BTREE",
         fields: [
-          { name: "accountId" },
+          { name: "userId" },
         ]
       },
     ]
   });
-  return user;
+  return reset;
   }
 }
