@@ -9,7 +9,7 @@ import { makeRegistrationData } from './srp.js'
 import { AtLoginFlags } from './character-tools.js'
 import initAuth from './models/auth/init-models.js'
 import initCharacters from './models/characters/init-models.js'
-import { AuthDb, CharactersDb, TestCharactersDb } from './db.js'
+import { AuthDb, CharactersDb } from './db.js'
 import config from './config.js'
 
 const { Op } = sequelize
@@ -17,9 +17,6 @@ const { Op } = sequelize
 const live = {
     auth: initAuth(AuthDb),
     characters: initCharacters(CharactersDb)
-}
-const test = {
-    characters: initCharacters(TestCharactersDb)
 }
 
 const maxAccountStr = 20
@@ -54,7 +51,6 @@ const rest = new REST({ version: '9' }).setToken(token)
 try {
     await AuthDb.authenticate()
     await CharactersDb.authenticate()
-    await TestCharactersDb.authenticate()
 
     console.log('Connection has been established successfully.')
 } catch (error) {
