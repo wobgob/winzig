@@ -350,52 +350,9 @@ client.on('interactionCreate', async interaction => {
     if (interaction.commandName === 'services') {
         let subcommand = interaction.options.getSubcommand()
 
-
-        if (subcommand === 'name-change') {
-            let userId = interaction.member.user.id;
-            let user = await live.auth.user.findOne({ where: { userId: userId } })
-
-            if (user === null || user.accountId === null) {
-                interaction.reply({ content: createAccount, ephemeral: true })
-                return
-            }
-
-            let account = await live.auth.account.findByPk(user.accountId)
-
-            if (account === null) {
-                interaction.reply({ content: accountNotFound, ephemeral: true })
-                return
-            }
-
-            if (account.online !== 0) {
-                interaction.reply({ content: logoff, ephemeral: true })
-                return
-            }
-
-            let oldName = interaction.options.getString('old')
-            let character = await live.characters.characters.findOne({ where: { name: oldName } })
-
-            if (character === null || character.account !== user.accountId) {
-                interaction.reply({ content: characterDoesntExist, ephemeral: true })
-                return
-            }
-
-            let newName = interaction.options.getString('new')
-            let other = await live.characters.characters.findOne({ where: { name: newName } })
-
-            if (other !== null) {
-                interaction.reply({ content: nameTaken, ephemeral: true })
-                return
-            }
-
-            character.name = newName;
-            await character.save()
-            console.log(character.toJSON())
-            interaction.reply({ content: `Name changed: ${newName}.`, ephemeral: true })
-        }
-
         let isFlag = (subcommand) => {
-            return subcommand === 'customise' || subcommand === 'race-change' || subcommand === 'faction-change'
+            return subcommand === 'name-change' || subcommand === 'customise'
+                || subcommand === 'race-change' || subcommand === 'faction-change'
         }
 
         if (isFlag(subcommand)) {
@@ -427,12 +384,14 @@ client.on('interactionCreate', async interaction => {
                 return
             }
 
-            if (subcommand === 'customise') {
-                character.atLogin = AtLoginFlags.AT_LOGIN_CUSTOMIZE
+            if (subcommand === 'name-change') {
+                character.at_login = AtLoginFlags.AT_LOGIN_RENAME
+            } else if (subcommand === 'customise') {
+                character.at_login = AtLoginFlags.AT_LOGIN_CUSTOMIZE
             } else if (subcommand === 'race-change') {
-                character.atLogin = AtLoginFlags.AT_LOGIN_CHANGE_RACE
+                character.at_login = AtLoginFlags.AT_LOGIN_CHANGE_RACE
             } else if (subcommand === 'faction-change') {
-                character.atLogin = AtLoginFlags.AT_LOGIN_CHANGE_FACTION
+                character.at_login = AtLoginFlags.AT_LOGIN_CHANGE_FACTION
             }
 
             await character.save()
