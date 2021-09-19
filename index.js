@@ -89,8 +89,7 @@ const character = new SlashCommandBuilder()
         subcommand
             .setName('name-change')
             .setDescription('Change a character\'s name.')
-            .addStringOption(option => option.setName('old').setDescription('Enter your old character name').setRequired(true))
-            .addStringOption(option => option.setName('new').setDescription('Enter your new character name').setRequired(true)))
+            .addStringOption(option => option.setName('name').setDescription('Enter your character\'s name').setRequired(true)))
     .addSubcommand(subcommand =>
         subcommand
             .setName('customise')
