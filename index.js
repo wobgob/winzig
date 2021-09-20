@@ -154,8 +154,12 @@ client.on('ready', async () => {
 client.on('guildMemberUpdate', async (oldMember, newMember) => {
     let user = await auth.user.findOne({ where: { userId: oldMember.user.id }})
     if (user === null) {
-        console.log(`User ${oldMember.user.id} not found`)
-        return
+        user = await auth.user.findOne({ where: { userId: newMember.user.id }})
+        
+        if (user === null) {
+            console.log(`User ${oldMember.user.id} and ${newMember.user.id} not found`)
+            return
+        }
     }
 
 	const removedRoles = oldMember.roles.cache.filter(role => !newMember.roles.cache.has(role.id));
