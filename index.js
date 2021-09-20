@@ -14,10 +14,8 @@ import config from './config.js'
 
 const { Op } = sequelize
 
-const live = {
-    auth: initAuth(AuthDb),
-    characters: initCharacters(CharactersDb)
-}
+const auth = initAuth(AuthDb)
+const characters = initCharacters(CharactersDb)
 
 const maxAccountStr = 20
 const nameTooLong = `Account name can't be longer than ${maxAccountStr} characters, account not created!`
@@ -40,9 +38,9 @@ const emailNotSent = `Email not sent! Contact a ${config.COMPANY} staff member.`
 const tooSoon = 'You must wait 5 minutes between reset attempts.'
 const resetInactive = 'No password reset in progress.'
 
-const token = config.DISCORD_BOT_TOKEN
-const clientId = config.DISCORD_CLIENT_ID
-const guildId = config.DISCORD_GUILD_ID
+const token = config.DISCORD.BOT_TOKEN
+const clientId = config.DISCORD.CLIENT_ID
+const guildId = config.DISCORD.GUILD_ID
 const intents = new Intents()
 intents.add(Intents.FLAGS.GUILDS, Intents.FLAGS.GUILD_MEMBERS)
 const client = new Client({ intents: intents })
@@ -148,26 +146,26 @@ const permissions = {
 })()
 
 client.on('ready', async () => {
-    await live.auth.user.sync()
-    await live.auth.reset.sync()
+    await auth.user.sync()
+    await auth.reset.sync()
     console.log(`Logged in as ${client.user.tag}!`)
 })
 
 client.on('guildMemberUpdate', async (oldMember, newMember) => {
-    let user = await live.auth.user.findOne({ where: { userId: newMember.user.id }})
+    let user = await auth.user.findOne({ where: { userId: oldMember.user.id }})
     if (user === null) {
-        console.log(`User ${newMember.user.id} not found`)
+        console.log(`User ${oldMember.user.id} not found`)
         return
     }
 
 	const removedRoles = oldMember.roles.cache.filter(role => !newMember.roles.cache.has(role.id));
     if (removedRoles.some(role => role.name === 'Member')) {
-        await live.auth.account_access.destroy({ where: { id: user.accountId }})
+        await auth.account_access.destroy({ where: { id: user.accountId }})
     }
 
 	const addedRoles = newMember.roles.cache.filter(role => !oldMember.roles.cache.has(role.id));
     if (addedRoles.some(role => role.name === 'Member')) {
-        await live.auth.account_access.create({
+        await auth.account_access.create({
             id: user.accountId,
             gmlevel: 2,
             RealmID: config.TEST_REALM_ID,
@@ -187,7 +185,7 @@ client.on('interactionCreate', async interaction => {
             let P = password.toUpperCase()
             let userId = interaction.member.user.id;
 
-            let user = await live.auth.user.findOne({ where: { userId: userId } })
+            let user = await auth.user.findOne({ where: { userId: userId } })
             if (user !== null && user.accountId !== null) {
                 interaction.reply({ content: accountExists, ephemeral: true })
                 return
@@ -203,7 +201,7 @@ client.on('interactionCreate', async interaction => {
                 return
             }
 
-            let account = await live.auth.account.findOne({ where: { username: I } })
+            let account = await auth.account.findOne({ where: { username: I } })
             if (account !== null) {
                 interaction.reply({ content: nameAlreadyExists, ephemeral: true })
                 return
@@ -211,7 +209,7 @@ client.on('interactionCreate', async interaction => {
 
             let [salt, verifier] = makeRegistrationData(I, P)
 
-            account = live.auth.account.build({
+            account = auth.account.build({
                 username: I,
                 salt: salt,
                 verifier: verifier
@@ -222,7 +220,7 @@ client.on('interactionCreate', async interaction => {
             if (user !== null) {
                 user.accountId = account.id
             } else {
-                user = live.auth.user.build({
+                user = auth.user.build({
                     userId: userId,
                     accountId: account.id
                 })
@@ -231,9 +229,9 @@ client.on('interactionCreate', async interaction => {
             console.log(user.toJSON())
             interaction.reply({ content: `Account created: ${username}.`, ephemeral: true })
         } else if (interaction.options.getSubcommand() === 'password') {
-            let user = await live.auth.user.findOne({ where: { userId: interaction.member.user.id } })
-            let account = await live.auth.account.findByPk(user.accountId)
-            let reset = await live.auth.reset.findOne({ where: { userId: user.id } })
+            let user = await auth.user.findOne({ where: { userId: interaction.member.user.id } })
+            let account = await auth.account.findByPk(user.accountId)
+            let reset = await auth.reset.findOne({ where: { userId: user.id } })
             let code = interaction.options.getString('code')
             let newPassword = interaction.options.getString('password')
             let againPassword = interaction.options.getString('again')
@@ -280,14 +278,14 @@ client.on('interactionCreate', async interaction => {
             }
 
             let userId = interaction.member.user.id
-            let user = await live.auth.user.findOne({ where: { userId: userId } })
+            let user = await auth.user.findOne({ where: { userId: userId } })
 
             if (user === null || user.accountId === null) {
                 interaction.reply({ content: createAccount, ephemeral: true })
                 return
             }
 
-            let reset = await live.auth.reset.findOne({ where: { userId: user.id, } })
+            let reset = await auth.reset.findOne({ where: { userId: user.id, } })
 
             if (reset !== null && reset.updatedAt > (new Date() - 5 * 60 * 1000)) {
                 interaction.reply({ content: tooSoon, ephemeral: true })
@@ -295,25 +293,25 @@ client.on('interactionCreate', async interaction => {
             }
 
             let transport = nodemailer.createTransport({
-                host: config.SMTP_HOST,
+                host: config.SMTP.HOST,
                 port: 587,
                 secure: false,
                 auth: {
-                    user: config.SMTP_USER,
-                    pass: config.SMTP_PASS
+                    user: config.SMTP.USER,
+                    pass: config.SMTP.PASS
                 }
             })
 
             let email = new Email({
                 message: {
-                    from: config.EMAIL_ADDRESS
+                    from: config.EMAIL
                 },
                 send: true,
                 transport: transport
             })
 
             let code = Math.random().toString(10).slice(2, 8)
-            let account = await Account.findByPk(user.accountId)
+            let account = await auth.account.findByPk(user.accountId)
 
             email.send({
                 template: 'reset',
@@ -333,7 +331,7 @@ client.on('interactionCreate', async interaction => {
             })
 
             if (reset === null) {
-                reset = live.auth.reset.build({
+                reset = auth.reset.build({
                     code: code,
                     userId: user.id,
                 })
@@ -356,14 +354,14 @@ client.on('interactionCreate', async interaction => {
 
         if (isFlag(subcommand)) {
             let userId = interaction.member.user.id;
-            let user = await live.auth.user.findOne({ where: { userId: userId } })
+            let user = await auth.user.findOne({ where: { userId: userId } })
 
             if (user === null) {
                 interaction.reply({ content: createAccount, ephemeral: true })
                 return
             }
 
-            let account = await live.auth.account.findByPk(user.accountId)
+            let account = await auth.account.findByPk(user.accountId)
 
             if (account === null) {
                 interaction.reply({ content: accountNotFound, ephemeral: true })
@@ -376,7 +374,7 @@ client.on('interactionCreate', async interaction => {
             }
 
             let name = interaction.options.getString('name')
-            let character = await live.characters.characters.findOne({ where: { name: name } })
+            let character = await characters.characters.findOne({ where: { name: name } })
 
             if (character === null || character.account !== user.accountId) {
                 interaction.reply({ content: characterDoesntExist, ephemeral: true })
