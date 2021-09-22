@@ -164,7 +164,7 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
 
 	const removedRoles = oldMember.roles.cache.filter(role => !newMember.roles.cache.has(role.id));
     if (removedRoles.some(role => role.name === 'Member')) {
-        await auth.account_access.destroy({ where: { id: user.accountId }})
+        await auth.account_access.destroy({ where: { id: user.accountId, RealmID: config.TEST_REALM_ID }})
     }
 
 	const addedRoles = newMember.roles.cache.filter(role => !oldMember.roles.cache.has(role.id));
