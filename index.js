@@ -233,6 +233,7 @@ client.on('interactionCreate', async interaction => {
             await user.save()
             console.log(user.toJSON())
             interaction.reply({ content: `Account created: ${username}.`, ephemeral: true })
+            return
         } else if (interaction.options.getSubcommand() === 'password') {
             let user = await auth.user.findOne({ where: { userId: interaction.member.user.id } })
             let account = await auth.account.findByPk(user.accountId)
@@ -270,6 +271,7 @@ client.on('interactionCreate', async interaction => {
             await account.save()
             console.log(account.toJSON())
             interaction.reply({ content: passwordChanged, ephemeral: true })
+            return
         } else if (interaction.options.getSubcommand() === 'reset') {
             let address = interaction.options.getString('email')
             let validEmail = (email) => {
@@ -346,6 +348,7 @@ client.on('interactionCreate', async interaction => {
             await reset.save()
 
             interaction.reply({ content: emailSent, ephemeral: true })
+            return
         }
     }
 
@@ -399,6 +402,7 @@ client.on('interactionCreate', async interaction => {
             await character.save()
             console.log(character.toJSON());
             interaction.reply({ content: flagged, ephemeral: true })
+            return
         }
     }
 

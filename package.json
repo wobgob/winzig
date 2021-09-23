@@ -19,7 +19,8 @@
     "email-templates": "^8.0.8",
     "mysql2": "^2.3.0",
     "pug": "^3.0.2",
-    "sequelize": "^6.6.5"
+    "sequelize": "^6.6.5",
+    "utf8": "^3.0.0"
   },
   "devDependencies": {
     "mocha": "^9.0.3"
