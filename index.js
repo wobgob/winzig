@@ -37,6 +37,7 @@ const emailSent = 'Email sent! If you do not receive it check your junk folder.'
 const emailNotSent = `Email not sent! Contact a ${config.COMPANY} staff member.`
 const tooSoon = 'You must wait 5 minutes between reset attempts.'
 const resetInactive = 'No password reset in progress.'
+const unknownCommand = 'Unknown command.'
 
 const token = config.DISCORD.BOT_TOKEN
 const clientId = config.DISCORD.CLIENT_ID
@@ -400,6 +401,8 @@ client.on('interactionCreate', async interaction => {
             interaction.reply({ content: flagged, ephemeral: true })
         }
     }
+
+    interaction.reply({ content: unknownCommand, ephemeral: true })
 })
 
 client.login(token)
