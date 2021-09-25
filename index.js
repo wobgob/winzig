@@ -152,20 +152,14 @@ const green = '#00FF00'
 
 let log = (color, command, subcommand, user, msg) => {
     let username = client.user.username
-    let avatarURL = client.user.avatarURL()
 
-    if (user !== null) {
+    if (user !== null)
         username = user.username
-        if (user.avatarURL === null)
-            avatarURL = ''
-        else
-            avatarURL = user.avatarURL()
-    }
 
     let embed = new MessageEmbed()
         .setColor(color)
         .setTitle(`${command} ${subcommand}`)
-        .setAuthor(username, avatarURL)
+        .setAuthor(username)
         .setDescription(msg)
     client.channels.cache.get(config.DISCORD.LOG_ID).send({ embeds: [embed ]})
 }
