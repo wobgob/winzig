@@ -1,6 +1,6 @@
-import { Client, Intents } from 'discord.js'
+import { Client, Intents, MessageEmbed } from 'discord.js'
 import { REST } from '@discordjs/rest'
-import { SlashCommandBuilder } from '@discordjs/builders'
+import { channelMention, SlashCommandBuilder } from '@discordjs/builders'
 import { Routes } from 'discord-api-types/v9'
 import Email from 'email-templates'
 import sequelize, { Sequelize } from 'sequelize'
@@ -146,10 +146,32 @@ const permissions = {
     }
 })()
 
+const red = '#FF0000'
+const yellow = '#FFFF00'
+const green = '#00FF00'
+
+let log = (color, command, subcommand, user, msg) => {
+    let username = client.user.username
+    let avatarURL = client.user.avatarURL()
+
+    if (user !== null) {
+        username = user.username
+        avatarURL = user.avatarURL()
+    }
+
+    let embed = new MessageEmbed()
+        .setColor(color)
+        .setTitle(`${command} ${subcommand}`)
+        .setAuthor(username, avatarURL)
+        .setDescription(msg)
+    client.channels.cache.get(config.DISCORD.LOG_ID).send({ embeds: [embed ]})
+}
+
 client.on('ready', async () => {
     await auth.user.sync()
     await auth.reset.sync()
     console.log(`Logged in as ${client.user.tag}!`)
+    log(green, 'Ready', '', null, `Logged in as ${client.user.tag}`)
 })
 
 client.on('guildMemberUpdate', async (oldMember, newMember) => {
@@ -166,16 +188,19 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
 	const removedRoles = oldMember.roles.cache.filter(role => !newMember.roles.cache.has(role.id));
     if (removedRoles.some(role => role.name === 'Member')) {
         await auth.account_access.destroy({ where: { id: user.accountId, RealmID: config.TEST_REALM_ID }})
+        log(yellow, 'guildMemberUpdate', '', oldMember.user, 'Removed Member role')
     }
 
 	const addedRoles = newMember.roles.cache.filter(role => !oldMember.roles.cache.has(role.id));
     if (addedRoles.some(role => role.name === 'Member')) {
+        await auth.account_access.destroy({ where: { id: user.accountId, RealmID: config.TEST_REALM_ID }})
         await auth.account_access.create({
             id: user.accountId,
             gmlevel: 2,
             RealmID: config.TEST_REALM_ID,
             comment: 'Set by Winzig'
         })
+        log(green, 'guildMemberUpdate', '', oldMember.user, 'Added Member role')
     }
 });
 
@@ -193,22 +218,26 @@ client.on('interactionCreate', async interaction => {
             let user = await auth.user.findOne({ where: { userId: userId } })
             if (user !== null && user.accountId !== null) {
                 interaction.reply({ content: accountExists, ephemeral: true })
+                log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.member.user, accountExists)
                 return
             }
 
             if (username.length > maxAccountStr) {
                 interaction.reply({ content: nameTooLong, ephemeral: true })
+                log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.member.user, nameTooLong)
                 return
             }
 
             if (password.length > maxPassStr) {
                 interaction.reply({ content: passTooLong, ephemeral: true })
+                log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.member.user, passTooLong)
                 return
             }
 
             let account = await auth.account.findOne({ where: { username: I } })
             if (account !== null) {
                 interaction.reply({ content: nameAlreadyExists, ephemeral: true })
+                log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.member.user, nameAlreadyExists)
                 return
             }
 
@@ -233,6 +262,7 @@ client.on('interactionCreate', async interaction => {
             await user.save()
             console.log(user.toJSON())
             interaction.reply({ content: `Account created: ${username}.`, ephemeral: true })
+            log(interaction.commandName, interaction.options.getSubcommand(), interaction.member.user, `Account created: ${username}.`)
             return
         } else if (interaction.options.getSubcommand() === 'password') {
             let user = await auth.user.findOne({ where: { userId: interaction.member.user.id } })
@@ -244,21 +274,25 @@ client.on('interactionCreate', async interaction => {
 
             if (reset === null || reset.updatedAt < (new Date() - 60 * 60 * 1000)) {
                 interaction.reply({ content: resetInactive, ephemeral: true })
+                log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.member.user, resetInactive)
                 return
             }
 
             if (reset.code !== code) {
                 interaction.reply({ content: wrongCode, ephemeral: true })
+                log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.member.user, wrongCode)
                 return
             }
 
             if (newPassword.length > maxPassStr) {
                 interaction.reply({ content: passTooLong, ephemeral: true })
+                log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.member.user, passTooLong)
                 return
             }
 
             if (newPassword !== againPassword) {
                 interaction.reply({ content: passwordDoesntMatch, ephemeral: true })
+                log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.member.user, passwordDoesntMatch)
                 return
             }
 
@@ -271,6 +305,7 @@ client.on('interactionCreate', async interaction => {
             await account.save()
             console.log(account.toJSON())
             interaction.reply({ content: passwordChanged, ephemeral: true })
+            log(green, interaction.commandName, interaction.options.getSubcommand(), interaction.member.user, passwordChanged)
             return
         } else if (interaction.options.getSubcommand() === 'reset') {
             let address = interaction.options.getString('email')
@@ -281,6 +316,7 @@ client.on('interactionCreate', async interaction => {
 
             if (!validEmail(address)) {
                 interaction.reply({ content: invalidEmail, ephemeral: true })
+                log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.member.user, invalidEmail)
                 return
             }
 
@@ -289,6 +325,7 @@ client.on('interactionCreate', async interaction => {
 
             if (user === null || user.accountId === null) {
                 interaction.reply({ content: createAccount, ephemeral: true })
+                log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.member.user, createAccount)
                 return
             }
 
@@ -296,6 +333,7 @@ client.on('interactionCreate', async interaction => {
 
             if (reset !== null && reset.updatedAt > (new Date() - 5 * 60 * 1000)) {
                 interaction.reply({ content: tooSoon, ephemeral: true })
+                log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.member.user, tooSoon)
                 return
             }
 
@@ -348,6 +386,7 @@ client.on('interactionCreate', async interaction => {
             await reset.save()
 
             interaction.reply({ content: emailSent, ephemeral: true })
+            log(green, interaction.commandName, interaction.options.getSubcommand(), interaction.member.user, emailSent)
             return
         }
     }
@@ -366,6 +405,7 @@ client.on('interactionCreate', async interaction => {
 
             if (user === null) {
                 interaction.reply({ content: createAccount, ephemeral: true })
+                log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.member.user, createAccount)
                 return
             }
 
@@ -373,11 +413,13 @@ client.on('interactionCreate', async interaction => {
 
             if (account === null) {
                 interaction.reply({ content: accountNotFound, ephemeral: true })
+                log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.member.user, accountNotFound)
                 return
             }
 
             if (account.online !== 0) {
                 interaction.reply({ content: logoff, ephemeral: true })
+                log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.member.user, logoff)
                 return
             }
 
@@ -386,6 +428,7 @@ client.on('interactionCreate', async interaction => {
 
             if (character === null || character.account !== user.accountId) {
                 interaction.reply({ content: characterDoesntExist, ephemeral: true })
+                log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.member.user, characterDoesntExist)
                 return
             }
 
@@ -402,11 +445,14 @@ client.on('interactionCreate', async interaction => {
             await character.save()
             console.log(character.toJSON());
             interaction.reply({ content: flagged, ephemeral: true })
+            log(green, interaction.commandName, interaction.options.getSubcommand(), interaction.member.user, flagged)
             return
         }
     }
 
     interaction.reply({ content: unknownCommand, ephemeral: true })
+    log(red, interaction.commandName, interaction.options.getSubcommand(), interaction.member.user, unknownCommand)
+    return
 })
 
 client.login(token)
