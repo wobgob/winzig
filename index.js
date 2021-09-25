@@ -259,7 +259,7 @@ client.on('interactionCreate', async interaction => {
             await user.save()
             console.log(user.toJSON())
             interaction.reply({ content: `Account created: ${username}.`, ephemeral: true })
-            log(interaction.commandName, interaction.options.getSubcommand(), interaction.member.user, `Account created: ${username}.`)
+            log(green, interaction.commandName, interaction.options.getSubcommand(), interaction.member.user, `Account created: ${username}.`)
             return
         } else if (interaction.options.getSubcommand() === 'password') {
             let user = await auth.user.findOne({ where: { userId: interaction.member.user.id } })
