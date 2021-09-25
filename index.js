@@ -156,7 +156,10 @@ let log = (color, command, subcommand, user, msg) => {
 
     if (user !== null) {
         username = user.username
-        avatarURL = user.avatarURL()
+        if (user.avatarURL === null)
+            avatarURL = ''
+        else
+            avatarURL = user.avatarURL()
     }
 
     let embed = new MessageEmbed()
