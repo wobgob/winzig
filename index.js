@@ -99,11 +99,11 @@ const character = new SlashCommandBuilder()
             .setName('race-change')
             .setDescription('Change a character\'s race (within your current faction).')
             .addStringOption(option => option.setName('name').setDescription('Enter your character\'s name').setRequired(true)))
-    .addSubcommand(subcommand =>
+    /*.addSubcommand(subcommand =>
         subcommand
             .setName('faction-change')
             .setDescription('Change a character\'s faction (Horde to Alliance or Alliance to Horde).')
-            .addStringOption(option => option.setName('name').setDescription('Enter your character\'s name').setRequired(true)))
+            .addStringOption(option => option.setName('name').setDescription('Enter your character\'s name').setRequired(true)))*/
 const commands = [account, character];
 
 const restricted = []
@@ -393,7 +393,7 @@ client.on('interactionCreate', async interaction => {
 
         let isFlag = (subcommand) => {
             return subcommand === 'name-change' || subcommand === 'customise'
-                || subcommand === 'race-change' || subcommand === 'faction-change'
+                || subcommand === 'race-change' /*|| subcommand === 'faction-change'*/
         }
 
         if (isFlag(subcommand)) {
@@ -435,9 +435,9 @@ client.on('interactionCreate', async interaction => {
                 character.at_login = AtLoginFlags.AT_LOGIN_CUSTOMIZE
             } else if (subcommand === 'race-change') {
                 character.at_login = AtLoginFlags.AT_LOGIN_CHANGE_RACE
-            } else if (subcommand === 'faction-change') {
+            } /*else if (subcommand === 'faction-change') {
                 character.at_login = AtLoginFlags.AT_LOGIN_CHANGE_FACTION
-            }
+            }*/
 
             await character.save()
             console.log(character.toJSON());
