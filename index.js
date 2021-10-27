@@ -68,7 +68,8 @@ const account = new SlashCommandBuilder()
             .setName('create')
             .setDescription('Create account and set a password to it.')
             .addStringOption(option => option.setName('username').setDescription('Enter your username').setRequired(true))
-            .addStringOption(option => option.setName('password').setDescription('Enter your password').setRequired(true)))
+            .addStringOption(option => option.setName('password').setDescription('Enter your password').setRequired(true))
+            .addStringOption(option => option.setName('again').setDescription('Enter your password again').setRequired(true)))
     .addSubcommand(subcommand =>
         subcommand
             .setName('password')
@@ -99,11 +100,6 @@ const character = new SlashCommandBuilder()
             .setName('race-change')
             .setDescription('Change a character\'s race (within your current faction).')
             .addStringOption(option => option.setName('name').setDescription('Enter your character\'s name').setRequired(true)))
-    /*.addSubcommand(subcommand =>
-        subcommand
-            .setName('faction-change')
-            .setDescription('Change a character\'s faction (Horde to Alliance or Alliance to Horde).')
-            .addStringOption(option => option.setName('name').setDescription('Enter your character\'s name').setRequired(true)))*/
 const commands = [account, character];
 
 const restricted = []
@@ -208,6 +204,7 @@ client.on('interactionCreate', async interaction => {
         if (interaction.options.getSubcommand() === 'create') {
             let username = interaction.options.getString('username')
             let password = interaction.options.getString('password')
+            let again = interaction.options.getString('again')
             let I = username.toUpperCase()
             let P = password.toUpperCase()
             let userId = interaction.member.user.id;
@@ -228,6 +225,12 @@ client.on('interactionCreate', async interaction => {
             if (password.length > maxPassStr) {
                 interaction.reply({ content: passTooLong, ephemeral: true })
                 log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.member.user, passTooLong)
+                return
+            }
+
+            if (password !== again) {
+                interaction.reply({ content: passwordDoesntMatch, ephemeral: true })
+                log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.member.user, passwordDoesntMatch)
                 return
             }
 
@@ -392,8 +395,7 @@ client.on('interactionCreate', async interaction => {
         let subcommand = interaction.options.getSubcommand()
 
         let isFlag = (subcommand) => {
-            return subcommand === 'name-change' || subcommand === 'customise'
-                || subcommand === 'race-change' /*|| subcommand === 'faction-change'*/
+            return subcommand === 'name-change' || subcommand === 'customise' || subcommand === 'race-change'
         }
 
         if (isFlag(subcommand)) {
@@ -435,9 +437,7 @@ client.on('interactionCreate', async interaction => {
                 character.at_login = AtLoginFlags.AT_LOGIN_CUSTOMIZE
             } else if (subcommand === 'race-change') {
                 character.at_login = AtLoginFlags.AT_LOGIN_CHANGE_RACE
-            } /*else if (subcommand === 'faction-change') {
-                character.at_login = AtLoginFlags.AT_LOGIN_CHANGE_FACTION
-            }*/
+            }
 
             await character.save()
             console.log(character.toJSON());
