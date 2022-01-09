@@ -21,6 +21,7 @@ import _character_spell from  "./character_spell.js";
 import _character_spell_cooldown from  "./character_spell_cooldown.js";
 import _character_talent from  "./character_talent.js";
 import _characters from  "./characters.js";
+import _faction_change from "./faction_change.js"
 import _item_instance from  "./item_instance.js";
 import _mail from  "./mail.js";
 import _mail_items from  "./mail_items.js";
@@ -50,6 +51,7 @@ export default function initModels(sequelize) {
   var character_spell_cooldown = _character_spell_cooldown.init(sequelize, DataTypes);
   var character_talent = _character_talent.init(sequelize, DataTypes);
   var characters = _characters.init(sequelize, DataTypes);
+  var faction_change = _faction_change.init(sequelize, DataTypes);
   var item_instance = _item_instance.init(sequelize, DataTypes);
   var mail = _mail.init(sequelize, DataTypes);
   var mail_items = _mail_items.init(sequelize, DataTypes);
@@ -80,6 +82,7 @@ export default function initModels(sequelize) {
     character_spell_cooldown,
     character_talent,
     characters,
+    faction_change,
     item_instance,
     mail,
     mail_items,

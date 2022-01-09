@@ -38,6 +38,7 @@ const emailNotSent = `Email not sent! Contact a ${config.COMPANY} staff member.`
 const tooSoon = 'You must wait 5 minutes between reset attempts.'
 const resetInactive = 'No password reset in progress.'
 const unknownCommand = 'Unknown command.'
+const waitOneDay = 'You must wait one day between faction changes.'
 
 const token = config.DISCORD.BOT_TOKEN
 const clientId = config.DISCORD.CLIENT_ID
@@ -99,6 +100,11 @@ const character = new SlashCommandBuilder()
         subcommand
             .setName('race-change')
             .setDescription('Change a character\'s race (within your current faction).')
+            .addStringOption(option => option.setName('name').setDescription('Enter your character\'s name').setRequired(true)))
+    .addSubcommand(subcommand =>
+        subcommand
+            .setName('faction-change')
+            .setDescription('Change a character\'s faction (Horde to Alliance or Alliance to Horde).')
             .addStringOption(option => option.setName('name').setDescription('Enter your character\'s name').setRequired(true)))
 const commands = [account, character];
 
@@ -163,6 +169,7 @@ let log = (color, command, subcommand, user, msg) => {
 client.on('ready', async () => {
     await auth.user.sync()
     await auth.reset.sync()
+    await characters.faction_change.sync()
     console.log(`Logged in as ${client.user.tag}!`)
     log(green, 'Ready', '', null, `Logged in as ${client.user.tag}`)
 })
@@ -329,7 +336,7 @@ client.on('interactionCreate', async interaction => {
                 return
             }
 
-            let reset = await auth.reset.findOne({ where: { userId: user.id, } })
+            let reset = await auth.reset.findOne({ where: { userId: user.id } })
 
             if (reset !== null && reset.updatedAt > (new Date() - 5 * 60 * 1000)) {
                 interaction.reply({ content: tooSoon, ephemeral: true })
@@ -395,7 +402,8 @@ client.on('interactionCreate', async interaction => {
         let subcommand = interaction.options.getSubcommand()
 
         let isFlag = (subcommand) => {
-            return subcommand === 'name-change' || subcommand === 'customise' || subcommand === 'race-change'
+            return subcommand === 'name-change' || subcommand === 'customise'
+                || subcommand === 'race-change' || subcommand === 'faction-change'
         }
 
         if (isFlag(subcommand)) {
@@ -437,6 +445,17 @@ client.on('interactionCreate', async interaction => {
                 character.at_login = AtLoginFlags.AT_LOGIN_CUSTOMIZE
             } else if (subcommand === 'race-change') {
                 character.at_login = AtLoginFlags.AT_LOGIN_CHANGE_RACE
+            } else if (subcommand === 'faction-change') {
+                let changed = await characters.faction_change.findOne({ where: { guid: character.guid, account: character.account } })
+
+                if (changed !== null && changed.createdAt > (new Date() - 24 * 60 * 60 * 1000)) {
+                    interaction.reply({ content: waitOneDay, ephemeral: true })
+                    log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.member.user, waitOneDay)
+                    return
+                }
+
+                await characters.faction_change.create({ guid: character.guid, account: character.account })
+                character.at_login = AtLoginFlags.AT_LOGIN_CHANGE_FACTION
             }
 
             await character.save()
