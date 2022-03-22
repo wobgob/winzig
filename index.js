@@ -448,13 +448,16 @@ client.on('interactionCreate', async interaction => {
             } else if (subcommand === 'faction-change') {
                 let changed = await characters.faction_change.findOne({ where: { guid: character.guid, account: character.account } })
 
-                if (changed !== null && changed.createdAt > (new Date() - 24 * 60 * 60 * 1000)) {
+                if (changed === null) {
+                    changed = await characters.faction_change.create({ guid: character.guid, account: character.account })
+                } else if (changed.updatedAt > (new Date() - 24 * 60 * 60 * 1000)) {
                     interaction.reply({ content: waitOneDay, ephemeral: true })
                     log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.member.user, waitOneDay)
                     return
                 }
 
-                await characters.faction_change.create({ guid: character.guid, account: character.account })
+                changed.changed('updatedAt', true)
+                await changed.update({ updatedAt: new Date() })
                 character.at_login = AtLoginFlags.AT_LOGIN_CHANGE_FACTION
             }
 
