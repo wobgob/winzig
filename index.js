@@ -112,9 +112,9 @@ const character = new SlashCommandBuilder()
             .addStringOption(option => option.setName('name').setDescription('Enter your character\'s name').setRequired(true)))
     .addSubcommand(subcommand =>
         subcommand
-            .setName('recruiter')
-            .setDescription('Set recruiter for your account.')
-            .addIntegerOption(option => option.setName('id').setDescription('Enter your recruiter\'s account ID.')))
+            .setName('link')
+            .setDescription('Link with another account.')
+            .addIntegerOption(option => option.setName('id').setDescription('Enter their account ID.')))
 const commands = [account, character];
 
 const restricted = []
@@ -429,7 +429,7 @@ client.on('interactionCreate', async interaction => {
                 || subcommand === 'race-change' || subcommand === 'faction-change'
         }
 
-        if (subcommand === 'recruiter') {
+        if (subcommand === 'link') {
             let userId = interaction.member.user.id;
             let user = await auth.user.findOne({ where: { userId: userId } })
 
@@ -463,7 +463,7 @@ client.on('interactionCreate', async interaction => {
             }
 
             if (id === account.id) {
-                let msg = 'You cannot recruit yourself.'
+                let msg = 'You cannot link with yourself.'
                 interaction.reply({ content: msg, ephemeral: true })
                 log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.member.user, msg)
                 return
@@ -471,7 +471,7 @@ client.on('interactionCreate', async interaction => {
 
             account.recruiter = id
             await account.save()
-            let msg = `Set recruiter to account ID ${id}.`
+            let msg = `Linked to account ID ${id}.`
             interaction.reply({ content: msg, ephemeral: true })
             log(green, interaction.commandName, interaction.options.getSubcommand(), interaction.member.user, msg)
             return
