@@ -83,6 +83,10 @@ const account = new SlashCommandBuilder()
             .setName('reset')
             .setDescription('Reset your password.')
             .addStringOption(option => option.setName('email').setDescription('Enter your email address').setRequired(true)))
+    .addSubcommand(subcommand =>
+        subcommand
+            .setName('id')
+            .setDescription('Get your account ID.'))
 const character = new SlashCommandBuilder()
     .setName('services')
     .setDescription('Character services.')
@@ -106,6 +110,11 @@ const character = new SlashCommandBuilder()
             .setName('faction-change')
             .setDescription('Change a character\'s faction (Horde to Alliance or Alliance to Horde).')
             .addStringOption(option => option.setName('name').setDescription('Enter your character\'s name').setRequired(true)))
+    .addSubcommand(subcommand =>
+        subcommand
+            .setName('recruiter')
+            .setDescription('Set recruiter for your account.')
+            .addIntegerOption(option => option.setName('id').setDescription('Enter your recruiter\'s account ID.')))
 const commands = [account, character];
 
 const restricted = []
@@ -395,6 +404,20 @@ client.on('interactionCreate', async interaction => {
             interaction.reply({ content: emailSent, ephemeral: true })
             log(green, interaction.commandName, interaction.options.getSubcommand(), interaction.member.user, emailSent)
             return
+        } else if (interaction.options.getSubcommand() === 'id') {
+            let userId = interaction.member.user.id;
+            let user = await auth.user.findOne({ where: { userId: userId } })
+
+            if (user === null) {
+                interaction.reply({ content: createAccount, ephemeral: true })
+                log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.member.user, createAccount)
+                return
+            }
+
+            let msg = `Your account ID is \`${user.accountId}\`.`
+            interaction.reply({ content: msg, ephemeral: true})
+            log(green, interaction.commandName, interaction.options.getSubcommand(), interaction.member.user, msg)
+            return
         }
     }
 
@@ -406,7 +429,53 @@ client.on('interactionCreate', async interaction => {
                 || subcommand === 'race-change' || subcommand === 'faction-change'
         }
 
-        if (isFlag(subcommand)) {
+        if (subcommand === 'recruiter') {
+            let userId = interaction.member.user.id;
+            let user = await auth.user.findOne({ where: { userId: userId } })
+
+            if (user === null) {
+                interaction.reply({ content: createAccount, ephemeral: true })
+                log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.member.user, createAccount)
+                return
+            }
+
+            let account = await auth.account.findByPk(user.accountId)
+
+            if (account === null) {
+                interaction.reply({ content: accountNotFound, ephemeral: true })
+                log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.member.user, accountNotFound)
+                return
+            }
+
+            if (account.online !== 0) {
+                interaction.reply({ content: logoff, ephemeral: true })
+                log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.member.user, logoff)
+                return
+            }
+
+            let id = interaction.options.getInteger('id')
+
+            if (id < 0) {
+                let msg = 'Account ID must be a positive number.'
+                interaction.reply({ content: msg, ephemeral: true })
+                log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.member.user, msg)
+                return
+            }
+
+            if (id === account.id) {
+                let msg = 'You cannot recruit yourself.'
+                interaction.reply({ content: msg, ephemeral: true })
+                log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.member.user, msg)
+                return
+            }
+
+            account.recruiter = id
+            await account.save()
+            let msg = `Set recruiter to account ID ${id}.`
+            interaction.reply({ content: msg, ephemeral: true })
+            log(green, interaction.commandName, interaction.options.getSubcommand(), interaction.member.user, msg)
+            return
+        } else if (isFlag(subcommand)) {
             let userId = interaction.member.user.id;
             let user = await auth.user.findOne({ where: { userId: userId } })
 
