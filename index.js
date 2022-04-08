@@ -114,7 +114,7 @@ const character = new SlashCommandBuilder()
         subcommand
             .setName('link')
             .setDescription('Link with another account.')
-            .addIntegerOption(option => option.setName('id').setDescription('Enter their account ID.')))
+            .addIntegerOption(option => option.setName('id').setDescription('Enter their account ID.').setRequired(true)))
 const commands = [account, character];
 
 const restricted = []
@@ -455,6 +455,13 @@ client.on('interactionCreate', async interaction => {
 
             let id = interaction.options.getInteger('id')
 
+            if (id === 0) {
+                let msg = 'You have unlinked your account.'
+                interaction.reply({ content: msg, ephemeral: true })
+                log(green, interaction.commandName, interaction.options.getSubcommand(), interaction.member.user, msg)
+                return
+            }
+
             if (id < 0) {
                 let msg = 'Account ID must be a positive number.'
                 interaction.reply({ content: msg, ephemeral: true })
@@ -464,6 +471,15 @@ client.on('interactionCreate', async interaction => {
 
             if (id === account.id) {
                 let msg = 'You cannot link with yourself.'
+                interaction.reply({ content: msg, ephemeral: true })
+                log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.member.user, msg)
+                return
+            }
+
+            let recruiter = await auth.account.findByPk(id)
+
+            if (recruiter !== null && recruiter.recruiter == account.id) {
+                let msg = 'Other account is already linked with you.'
                 interaction.reply({ content: msg, ephemeral: true })
                 log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.member.user, msg)
                 return
