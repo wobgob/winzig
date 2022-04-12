@@ -509,6 +509,7 @@ client.on('interactionCreate', async interaction => {
 
             test.level = live.level
             test.xp = live.xp
+            test.money = live.money
             test.taximask = live.taximask
             test.totaltime = live.totaltime
             test.leveltime = live.leveltime
