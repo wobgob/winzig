@@ -184,9 +184,6 @@ let log = (color, command, subcommand, user, msg) => {
     client.channels.cache.get(config.DISCORD.LOG_ID).send({ embeds: [embed ]})
 }
 
-let copy = async (liveModel, testModel, liveGuid, testGuid) => {
-}
-
 client.on('ready', async () => {
     await auth.user.sync()
     await auth.reset.sync()
@@ -224,6 +221,8 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
         log(green, 'guildMemberUpdate', '', oldMember.user, 'Added Member role')
     }
 });
+
+let copyInProgress = false
 
 client.on('interactionCreate', async interaction => {
     if (!interaction.isCommand()) return
@@ -442,6 +441,13 @@ client.on('interactionCreate', async interaction => {
         }
 
         if (subcommand === 'copy') {
+            if (copyInProgress) {
+                let msg = 'The server is currently busy. Please try again in a few seconds.'
+                interaction.reply({ content: msg, ephemeral: true })
+                log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.member.user, msg)
+                return
+            }
+
             let userId = interaction.member.user.id;
             let user = await auth.user.findOne({ where: { userId: userId } })
 
@@ -471,40 +477,41 @@ client.on('interactionCreate', async interaction => {
             let test = await test_characters.characters.findOne({ where: { name: dest }})
 
             if (live === null || live.account !== user.accountId) {
-                let msg = "Live character does not exist!"
+                let msg = 'Live character does not exist!'
                 interaction.reply({ content: msg, ephemeral: true })
                 log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.member.user, msg)
                 return
             }
 
             if (test === null /*|| test.account !== user.accountId*/) {
-                let msg = "Test character does not exist!"
+                let msg = 'Test character does not exist!'
                 interaction.reply({ content: msg, ephemeral: true })
                 log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.member.user, msg)
                 return
             }
 
             if (live.class !== test.class) {
-                let msg = "The live character is not the same class as the test character."
+                let msg = 'The live character is not the same class as the test character.'
                 interaction.reply({ content: msg, ephmeral: true })
                 log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.member.user, msg)
                 return
             }
 
             if (live.race !== test.race) {
-                let msg = "The live character is not the same race as the test character."
+                let msg = 'The live character is not the same race as the test character.'
                 interaction.reply({ content: msg, ephmeral: true })
                 log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.member.user, msg)
                 return
             }
 
             if (test.cinematic === 1) {
-                let msg = "Test character has been logged into."
+                let msg = 'Test character has been logged into.'
                 interaction.reply({ content: msg, ephmeral: true })
                 log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.member.user, msg)
                 return
             }
 
+            copyInProgress = true
             await interaction.deferReply({ ephemeral: true });
 
             test.level = live.level
@@ -531,7 +538,7 @@ client.on('interactionCreate', async interaction => {
             let liveHomebind = await characters.character_homebind.findByPk(live.guid)
 
             if (liveHomebind === null) {
-                let msg = "Live character's homebind does not exist!"
+                let msg = 'Live character\'s homebind does not exist!'
                 interaction.reply({ content: msg, ephemeral: true })
                 log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.member.user, msg)
                 return
@@ -849,6 +856,7 @@ client.on('interactionCreate', async interaction => {
                 })
             }
 
+            copyInProgress = false
             let msg = "Character copy complete."
             interaction.editReply({ content: msg, ephemeral: true })
             log(green, interaction.commandName, interaction.options.getSubcommand(), interaction.member.user, msg)
