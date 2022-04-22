@@ -205,14 +205,14 @@ client.on('interactionCreate', async interaction => {
 
     if (interaction.member !== null) {
         let msg = 'Direct Message Winzig with your application command.'
-        interaction.reply({ content: msg, ephemeral: false })
+        interaction.reply({ content: msg, ephemeral: true })
         log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.user, msg)
         return
     }
 
     if (interaction.user === null) {
         let msg = 'Unable to determine Discord user.'
-        interaction.reply({ content: msg, ephemeral: false })
+        interaction.reply({ content: msg, ephemeral: true })
         log(red, interaction.commandName, interaction.options.getSubcommand(), interaction.user, msg)
         return
     }
