@@ -126,39 +126,14 @@ const character = new SlashCommandBuilder()
             .addStringOption(option => option.setName('test').setDescription('Character to copy to.').setRequired(true)))
 const commands = [account, character];
 
-const restricted = []
-const ROLE = 1
-const permissions = {
-    permissions: [
-        {
-            id: `${config.ROLES.INNKEEPER}`,
-            type: ROLE,
-            permission: true,
-        }
-    ]
-};
-
 (async () => {
     try {
         console.log('Started refreshing application (/) commands.')
 
         await rest.put(
-            Routes.applicationGuildCommands(clientId, guildId),
+            Routes.applicationCommands(clientId),
             { body: commands },
         )
-
-        let cmds = await rest.get(
-            Routes.applicationGuildCommands(clientId, guildId)
-        )
-
-        for (let cmd in cmds) {
-            if (restricted.includes(cmd.name)) {
-                await rest.put(
-                    Routes.applicationCommandPermissions(clientId, guildId, cmd.id),
-                    { body: permissions }
-                )
-            }
-        }
 
         console.log('Successfully reloaded application (/) commands.')
     } catch (error) {
@@ -225,7 +200,22 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
 let copyInProgress = false
 
 client.on('interactionCreate', async interaction => {
-    if (!interaction.isCommand()) return
+    if (!interaction.isCommand())
+        return
+
+    if (interaction.member !== null) {
+        let msg = 'Direct Message Winzig with your application command.'
+        interaction.reply({ content: msg, ephemeral: false })
+        log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.user, msg)
+        return
+    }
+
+    if (interaction.user === null) {
+        let msg = 'Unable to determine Discord user.'
+        interaction.reply({ content: msg, ephemeral: false })
+        log(red, interaction.commandName, interaction.options.getSubcommand(), interaction.user, msg)
+        return
+    }
 
     if (interaction.commandName === 'account') {
         if (interaction.options.getSubcommand() === 'create') {
@@ -234,37 +224,37 @@ client.on('interactionCreate', async interaction => {
             let again = interaction.options.getString('again')
             let I = username.toUpperCase()
             let P = password.toUpperCase()
-            let userId = interaction.member.user.id;
+            let userId = interaction.user.id
 
             let user = await auth.user.findOne({ where: { userId: userId } })
             if (user !== null && user.accountId !== null) {
-                interaction.reply({ content: accountExists, ephemeral: true })
-                log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.member.user, accountExists)
+                interaction.reply({ content: accountExists, ephemeral: false })
+                log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.user, accountExists)
                 return
             }
 
             if (username.length > maxAccountStr) {
-                interaction.reply({ content: nameTooLong, ephemeral: true })
-                log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.member.user, nameTooLong)
+                interaction.reply({ content: nameTooLong, ephemeral: false })
+                log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.user, nameTooLong)
                 return
             }
 
             if (password.length > maxPassStr) {
-                interaction.reply({ content: passTooLong, ephemeral: true })
-                log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.member.user, passTooLong)
+                interaction.reply({ content: passTooLong, ephemeral: false })
+                log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.user, passTooLong)
                 return
             }
 
             if (password !== again) {
-                interaction.reply({ content: passwordDoesntMatch, ephemeral: true })
-                log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.member.user, passwordDoesntMatch)
+                interaction.reply({ content: passwordDoesntMatch, ephemeral: false })
+                log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.user, passwordDoesntMatch)
                 return
             }
 
             let account = await auth.account.findOne({ where: { username: I } })
             if (account !== null) {
-                interaction.reply({ content: nameAlreadyExists, ephemeral: true })
-                log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.member.user, nameAlreadyExists)
+                interaction.reply({ content: nameAlreadyExists, ephemeral: false })
+                log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.user, nameAlreadyExists)
                 return
             }
 
@@ -288,11 +278,11 @@ client.on('interactionCreate', async interaction => {
             }
             await user.save()
             console.log(user.toJSON())
-            interaction.reply({ content: `Account created: ${username}.`, ephemeral: true })
-            log(green, interaction.commandName, interaction.options.getSubcommand(), interaction.member.user, `Account created: ${username}.`)
+            interaction.reply({ content: `Account created: ${username}.`, ephemeral: false })
+            log(green, interaction.commandName, interaction.options.getSubcommand(), interaction.user, `Account created: ${username}.`)
             return
         } else if (interaction.options.getSubcommand() === 'password') {
-            let user = await auth.user.findOne({ where: { userId: interaction.member.user.id } })
+            let user = await auth.user.findOne({ where: { userId: interaction.user.id } })
             let account = await auth.account.findByPk(user.accountId)
             let reset = await auth.reset.findOne({ where: { userId: user.id } })
             let code = interaction.options.getString('code')
@@ -300,26 +290,26 @@ client.on('interactionCreate', async interaction => {
             let againPassword = interaction.options.getString('again')
 
             if (reset === null || reset.updatedAt < (new Date() - 60 * 60 * 1000)) {
-                interaction.reply({ content: resetInactive, ephemeral: true })
-                log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.member.user, resetInactive)
+                interaction.reply({ content: resetInactive, ephemeral: false })
+                log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.user, resetInactive)
                 return
             }
 
             if (reset.code !== code) {
-                interaction.reply({ content: wrongCode, ephemeral: true })
-                log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.member.user, wrongCode)
+                interaction.reply({ content: wrongCode, ephemeral: false })
+                log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.user, wrongCode)
                 return
             }
 
             if (newPassword.length > maxPassStr) {
-                interaction.reply({ content: passTooLong, ephemeral: true })
-                log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.member.user, passTooLong)
+                interaction.reply({ content: passTooLong, ephemeral: false })
+                log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.user, passTooLong)
                 return
             }
 
             if (newPassword !== againPassword) {
-                interaction.reply({ content: passwordDoesntMatch, ephemeral: true })
-                log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.member.user, passwordDoesntMatch)
+                interaction.reply({ content: passwordDoesntMatch, ephemeral: false })
+                log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.user, passwordDoesntMatch)
                 return
             }
 
@@ -331,8 +321,8 @@ client.on('interactionCreate', async interaction => {
             account.verifier = verifier
             await account.save()
             console.log(account.toJSON())
-            interaction.reply({ content: passwordChanged, ephemeral: true })
-            log(green, interaction.commandName, interaction.options.getSubcommand(), interaction.member.user, passwordChanged)
+            interaction.reply({ content: passwordChanged, ephemeral: false })
+            log(green, interaction.commandName, interaction.options.getSubcommand(), interaction.user, passwordChanged)
             return
         } else if (interaction.options.getSubcommand() === 'reset') {
             let address = interaction.options.getString('email')
@@ -342,25 +332,25 @@ client.on('interactionCreate', async interaction => {
             }
 
             if (!validEmail(address)) {
-                interaction.reply({ content: invalidEmail, ephemeral: true })
-                log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.member.user, invalidEmail)
+                interaction.reply({ content: invalidEmail, ephemeral: false })
+                log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.user, invalidEmail)
                 return
             }
 
-            let userId = interaction.member.user.id
+            let userId = interaction.user.id
             let user = await auth.user.findOne({ where: { userId: userId } })
 
             if (user === null || user.accountId === null) {
-                interaction.reply({ content: createAccount, ephemeral: true })
-                log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.member.user, createAccount)
+                interaction.reply({ content: createAccount, ephemeral: false })
+                log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.user, createAccount)
                 return
             }
 
             let reset = await auth.reset.findOne({ where: { userId: user.id } })
 
             if (reset !== null && reset.updatedAt > (new Date() - 5 * 60 * 1000)) {
-                interaction.reply({ content: tooSoon, ephemeral: true })
-                log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.member.user, tooSoon)
+                interaction.reply({ content: tooSoon, ephemeral: false })
+                log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.user, tooSoon)
                 return
             }
 
@@ -398,7 +388,8 @@ client.on('interactionCreate', async interaction => {
                 }
             }).then(console.log).catch((err) => {
                 console.error(err)
-                interaction.reply({ content: emailNotSent, ephemeral: true })
+                interaction.reply({ content: emailNotSent, ephemeral: false })
+                log(red, interaction.commandName, interaction.options.getSubcommand(), interaction.user, emailNotSent)
                 return
             })
 
@@ -412,22 +403,22 @@ client.on('interactionCreate', async interaction => {
             }
             await reset.save()
 
-            interaction.reply({ content: emailSent, ephemeral: true })
-            log(green, interaction.commandName, interaction.options.getSubcommand(), interaction.member.user, emailSent)
+            interaction.reply({ content: emailSent, ephemeral: false })
+            log(green, interaction.commandName, interaction.options.getSubcommand(), interaction.user, emailSent)
             return
         } else if (interaction.options.getSubcommand() === 'id') {
-            let userId = interaction.member.user.id;
+            let userId = interaction.user.id;
             let user = await auth.user.findOne({ where: { userId: userId } })
 
             if (user === null) {
-                interaction.reply({ content: createAccount, ephemeral: true })
-                log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.member.user, createAccount)
+                interaction.reply({ content: createAccount, ephemeral: false })
+                log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.user, createAccount)
                 return
             }
 
             let msg = `Your account ID is \`${user.accountId}\`.`
-            interaction.reply({ content: msg, ephemeral: true})
-            log(green, interaction.commandName, interaction.options.getSubcommand(), interaction.member.user, msg)
+            interaction.reply({ content: msg, ephemeral: false})
+            log(green, interaction.commandName, interaction.options.getSubcommand(), interaction.user, msg)
             return
         }
     }
@@ -443,31 +434,31 @@ client.on('interactionCreate', async interaction => {
         if (subcommand === 'copy') {
             if (copyInProgress) {
                 let msg = 'The server is currently busy. Please try again in a few seconds.'
-                interaction.reply({ content: msg, ephemeral: true })
-                log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.member.user, msg)
+                interaction.reply({ content: msg, ephemeral: false })
+                log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.user, msg)
                 return
             }
 
-            let userId = interaction.member.user.id;
+            let userId = interaction.user.id;
             let user = await auth.user.findOne({ where: { userId: userId } })
 
             if (user === null) {
-                interaction.reply({ content: createAccount, ephemeral: true })
-                log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.member.user, createAccount)
+                interaction.reply({ content: createAccount, ephemeral: false })
+                log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.user, createAccount)
                 return
             }
 
             let account = await auth.account.findByPk(user.accountId)
 
             if (account === null) {
-                interaction.reply({ content: accountNotFound, ephemeral: true })
-                log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.member.user, accountNotFound)
+                interaction.reply({ content: accountNotFound, ephemeral: false })
+                log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.user, accountNotFound)
                 return
             }
 
             if (account.online !== 0) {
-                interaction.reply({ content: logoff, ephemeral: true })
-                log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.member.user, logoff)
+                interaction.reply({ content: logoff, ephemeral: false })
+                log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.user, logoff)
                 return
             }
 
@@ -478,41 +469,41 @@ client.on('interactionCreate', async interaction => {
 
             if (live === null || live.account !== user.accountId) {
                 let msg = 'Live character does not exist!'
-                interaction.reply({ content: msg, ephemeral: true })
-                log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.member.user, msg)
+                interaction.reply({ content: msg, ephemeral: false })
+                log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.user, msg)
                 return
             }
 
             if (test === null || test.account !== user.accountId) {
                 let msg = 'Test character does not exist!'
-                interaction.reply({ content: msg, ephemeral: true })
-                log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.member.user, msg)
+                interaction.reply({ content: msg, ephemeral: false })
+                log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.user, msg)
                 return
             }
 
             if (live.class !== test.class) {
                 let msg = 'The live character is not the same class as the test character.'
                 interaction.reply({ content: msg, ephmeral: true })
-                log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.member.user, msg)
+                log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.user, msg)
                 return
             }
 
             if (live.race !== test.race) {
                 let msg = 'The live character is not the same race as the test character.'
                 interaction.reply({ content: msg, ephmeral: true })
-                log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.member.user, msg)
+                log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.user, msg)
                 return
             }
 
             if (test.cinematic === 1) {
                 let msg = 'Test character has been logged into.'
                 interaction.reply({ content: msg, ephmeral: true })
-                log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.member.user, msg)
+                log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.user, msg)
                 return
             }
 
             copyInProgress = true
-            await interaction.deferReply({ ephemeral: true });
+            await interaction.deferReply({ ephemeral: false });
 
             test.level = live.level
             test.xp = live.xp
@@ -539,8 +530,8 @@ client.on('interactionCreate', async interaction => {
 
             if (liveHomebind === null) {
                 let msg = 'Live character\'s homebind does not exist!'
-                interaction.reply({ content: msg, ephemeral: true })
-                log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.member.user, msg)
+                interaction.reply({ content: msg, ephemeral: false })
+                log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.user, msg)
                 return
             }
 
@@ -858,32 +849,32 @@ client.on('interactionCreate', async interaction => {
 
             copyInProgress = false
             let msg = "Character copy complete."
-            interaction.editReply({ content: msg, ephemeral: true })
-            log(green, interaction.commandName, interaction.options.getSubcommand(), interaction.member.user, msg)
+            interaction.editReply({ content: msg, ephemeral: false })
+            log(green, interaction.commandName, interaction.options.getSubcommand(), interaction.user, msg)
             return
         }
 
         if (subcommand === 'link') {
-            let userId = interaction.member.user.id;
+            let userId = interaction.user.id;
             let user = await auth.user.findOne({ where: { userId: userId } })
 
             if (user === null) {
-                interaction.reply({ content: createAccount, ephemeral: true })
-                log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.member.user, createAccount)
+                interaction.reply({ content: createAccount, ephemeral: false })
+                log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.user, createAccount)
                 return
             }
 
             let account = await auth.account.findByPk(user.accountId)
 
             if (account === null) {
-                interaction.reply({ content: accountNotFound, ephemeral: true })
-                log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.member.user, accountNotFound)
+                interaction.reply({ content: accountNotFound, ephemeral: false })
+                log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.user, accountNotFound)
                 return
             }
 
             if (account.online !== 0) {
-                interaction.reply({ content: logoff, ephemeral: true })
-                log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.member.user, logoff)
+                interaction.reply({ content: logoff, ephemeral: false })
+                log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.user, logoff)
                 return
             }
 
@@ -891,22 +882,22 @@ client.on('interactionCreate', async interaction => {
 
             if (id === 0) {
                 let msg = 'You have unlinked your account.'
-                interaction.reply({ content: msg, ephemeral: true })
-                log(green, interaction.commandName, interaction.options.getSubcommand(), interaction.member.user, msg)
+                interaction.reply({ content: msg, ephemeral: false })
+                log(green, interaction.commandName, interaction.options.getSubcommand(), interaction.user, msg)
                 return
             }
 
             if (id < 0) {
                 let msg = 'Account ID must be a positive number.'
-                interaction.reply({ content: msg, ephemeral: true })
-                log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.member.user, msg)
+                interaction.reply({ content: msg, ephemeral: false })
+                log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.user, msg)
                 return
             }
 
             if (id === account.id) {
                 let msg = 'You cannot link with yourself.'
-                interaction.reply({ content: msg, ephemeral: true })
-                log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.member.user, msg)
+                interaction.reply({ content: msg, ephemeral: false })
+                log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.user, msg)
                 return
             }
 
@@ -914,38 +905,38 @@ client.on('interactionCreate', async interaction => {
 
             if (recruiter !== null && recruiter.recruiter == account.id) {
                 let msg = 'Other account is already linked with you.'
-                interaction.reply({ content: msg, ephemeral: true })
-                log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.member.user, msg)
+                interaction.reply({ content: msg, ephemeral: false })
+                log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.user, msg)
                 return
             }
 
             account.recruiter = id
             await account.save()
             let msg = `Linked to account ID ${id}.`
-            interaction.reply({ content: msg, ephemeral: true })
-            log(green, interaction.commandName, interaction.options.getSubcommand(), interaction.member.user, msg)
+            interaction.reply({ content: msg, ephemeral: false })
+            log(green, interaction.commandName, interaction.options.getSubcommand(), interaction.user, msg)
             return
         } else if (isFlag(subcommand)) {
-            let userId = interaction.member.user.id;
+            let userId = interaction.user.id;
             let user = await auth.user.findOne({ where: { userId: userId } })
 
             if (user === null) {
-                interaction.reply({ content: createAccount, ephemeral: true })
-                log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.member.user, createAccount)
+                interaction.reply({ content: createAccount, ephemeral: false })
+                log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.user, createAccount)
                 return
             }
 
             let account = await auth.account.findByPk(user.accountId)
 
             if (account === null) {
-                interaction.reply({ content: accountNotFound, ephemeral: true })
-                log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.member.user, accountNotFound)
+                interaction.reply({ content: accountNotFound, ephemeral: false })
+                log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.user, accountNotFound)
                 return
             }
 
             if (account.online !== 0) {
-                interaction.reply({ content: logoff, ephemeral: true })
-                log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.member.user, logoff)
+                interaction.reply({ content: logoff, ephemeral: false })
+                log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.user, logoff)
                 return
             }
 
@@ -953,8 +944,8 @@ client.on('interactionCreate', async interaction => {
             let character = await characters.characters.findOne({ where: { name: name } })
 
             if (character === null || character.account !== user.accountId) {
-                interaction.reply({ content: characterDoesntExist, ephemeral: true })
-                log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.member.user, characterDoesntExist)
+                interaction.reply({ content: characterDoesntExist, ephemeral: false })
+                log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.user, characterDoesntExist)
                 return
             }
 
@@ -970,8 +961,8 @@ client.on('interactionCreate', async interaction => {
                 if (changed === null) {
                     changed = await characters.faction_change.create({ guid: character.guid, account: character.account })
                 } else if (changed.updatedAt > (new Date() - 24 * 60 * 60 * 1000)) {
-                    interaction.reply({ content: waitOneDay, ephemeral: true })
-                    log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.member.user, waitOneDay)
+                    interaction.reply({ content: waitOneDay, ephemeral: false })
+                    log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.user, waitOneDay)
                     return
                 }
 
@@ -982,14 +973,14 @@ client.on('interactionCreate', async interaction => {
 
             await character.save()
             console.log(character.toJSON());
-            interaction.reply({ content: flagged, ephemeral: true })
-            log(green, interaction.commandName, interaction.options.getSubcommand(), interaction.member.user, flagged)
+            interaction.reply({ content: flagged, ephemeral: false })
+            log(green, interaction.commandName, interaction.options.getSubcommand(), interaction.user, flagged)
             return
         }
     }
 
-    interaction.reply({ content: unknownCommand, ephemeral: true })
-    log(red, interaction.commandName, interaction.options.getSubcommand(), interaction.member.user, unknownCommand)
+    interaction.reply({ content: unknownCommand, ephemeral: false })
+    log(red, interaction.commandName, interaction.options.getSubcommand(), interaction.user, unknownCommand)
     return
 })
 
