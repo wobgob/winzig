@@ -794,14 +794,22 @@ client.on('interactionCreate', async interaction => {
                 }
             })
 
-            await test_characters.character_inventory.destroy({
-                where: {
-                    guid: test.guid,
-                    item: {
-                        [Op.not]: hearthstone.guid
+            if (hearthstone !== null) {
+                await test_characters.character_inventory.destroy({
+                    where: {
+                        guid: test.guid,
+                        item: {
+                            [Op.not]: hearthstone.guid
+                        }
                     }
-                }
-            })
+                })
+            } else {
+                await test_characters.character_inventory.destroy({
+                    where: {
+                        guid: test.guid
+                    }
+                })
+            }
 
             let max = await test_characters.item_instance.max('guid')
 
