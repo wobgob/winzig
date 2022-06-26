@@ -414,6 +414,12 @@ client.on('interactionCreate', async interaction => {
                 return
             }
 
+            if (account.online !== 0) {
+                interaction.reply({ content: logoff, ephemeral: false })
+                log(yellow, interaction.commandName, interaction.options.getSubcommand(), interaction.user, logoff)
+                return
+            }
+
             let name = interaction.options.getString('name')
             let character = await characters.characters.findOne({ where: { name: name } })
 
