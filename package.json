@@ -4,7 +4,7 @@
   "description": "Discord bot for AzerothCore servers",
   "main": "index.js",
   "scripts": {
-    "start": "ts-node src/bot.ts"
+    "start": "ts-node src/index.ts"
   },
   "repository": {
     "type": "git",
@@ -23,6 +23,7 @@
   },
   "homepage": "https://github.com/wobgob/winzig#readme",
   "dependencies": {
+    "bigint-mod-arith": "^3.1.1",
     "discord.js": "^14.3.0",
     "mysql2": "^2.3.3",
     "reflect-metadata": "^0.1.13",
