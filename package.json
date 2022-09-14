@@ -1,0 +1,25 @@
+{
+  "name": "winzig",
+  "version": "0.1.0",
+  "description": "Discord bot for AzerothCore servers",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wobgob/winzig.git"
+  },
+  "keywords": [
+    "discord",
+    "bot",
+    "azerothcore",
+    "wow"
+  ],
+  "author": "Jarrod Ingram <jarrod.jeffi@gmail.com>",
+  "license": "GPL-3.0-or-later",
+  "bugs": {
+    "url": "https://github.com/wobgob/winzig/issues"
+  },
+  "homepage": "https://github.com/wobgob/winzig#readme"
+}
