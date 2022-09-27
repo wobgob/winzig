@@ -1,4 +1,3 @@
-import "dotenv/config"
 import { Client } from "discord.js"
 import init from "./database"
 import ready from "./listeners/ready"
