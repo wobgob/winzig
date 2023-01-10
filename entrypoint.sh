@@ -10,4 +10,4 @@ if [ -z "$DATABASE_URI" ]; then
     exit 1
 fi
 
-node /home/node/app/dist/index.js
+until node /home/node/app/dist/index.js; do sleep 1; done
